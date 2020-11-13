@@ -6,22 +6,26 @@ on:
     branches: [main]
 jobs:
   main:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.config.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-        action:
-          - setup-connect
+        config:
+          - os: ubuntu-latest
+            action: setup-connect
+            regress-with:
+              api-key: bogus
+              url: https://connect.example.org
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: ${{ matrix.action }}
+        working-directory: ${{ matrix.config.action }}
       - run: yarn build
-        working-directory: ${{ matrix.action }}
+        working-directory: ${{ matrix.config.action }}
       - run: yarn test
-        working-directory: ${{ matrix.action }}
+        working-directory: ${{ matrix.config.action }}
+      - uses: ./${{ matrix.config.action }}
+        with: ${{ matrix.config.regress-with }}

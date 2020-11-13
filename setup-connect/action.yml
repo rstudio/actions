@@ -1,0 +1,11 @@
+name: 'Setup RStudio Connect environment'
+description: 'Setup an environment to work with an RStudio Connect API'
+author: RStudio Developers
+inputs:
+  api-key:
+    description: 'API key generated in RStudio Connect'
+  url:
+    description: 'RStudio Connect URL'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
