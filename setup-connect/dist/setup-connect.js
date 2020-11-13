@@ -28,20 +28,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.run = void 0;
+exports.setupConnect = void 0;
 const core = __importStar(require("@actions/core"));
-function run() {
+function setupConnect(args) {
     return __awaiter(this, void 0, void 0, function* () {
-        try {
-            core.debug("started action");
-        }
-        catch (err) {
-            core.setFailed(err);
-        }
+        core.debug("not doing anything");
     });
 }
-exports.run = run;
+exports.setupConnect = setupConnect;
 ;
-if (require.main === module) {
-    run();
-}
