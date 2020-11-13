@@ -1,0 +1,27 @@
+name: main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  main:
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+        action:
+          - setup-connect
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
+      - run: yarn install
+        working-directory: ${{ matrix.action }}
+      - run: yarn build
+        working-directory: ${{ matrix.action }}
+      - run: yarn test
+        working-directory: ${{ matrix.action }}
