@@ -5,28 +5,25 @@ on:
   pull_request:
     branches: [main]
 jobs:
-  main:
-    runs-on: ${{ matrix.config.os }}
+  setup-connect:
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        config:
-          - os: ubuntu-latest
-            action: setup-connect
-            regress-with:
-              api-key: bogus
-              url: https://connect.example.org
+        os:
+          - ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: ${{ matrix.config.action }}
+        working-directory: setup-connect
       - run: yarn build
-        working-directory: ${{ matrix.config.action }}
+        working-directory: setup-connect
       - run: yarn test
-        working-directory: ${{ matrix.config.action }}
-      # this doesn't work, so figure out the right way...
-      # - uses: ./${{ matrix.config.action }}
-      #   with: ${{ matrix.config.regress-with }}
+        working-directory: setup-connect
+      - uses: ./setup-connect
+        with:
+          api-key: bogus
+          url: https://connect.example.org
