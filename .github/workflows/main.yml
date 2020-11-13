@@ -1,0 +1,29 @@
+name: main
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  setup-connect:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
+      - run: yarn install
+        working-directory: setup-connect
+      - run: yarn build
+        working-directory: setup-connect
+      - run: yarn test
+        working-directory: setup-connect
+      - uses: ./setup-connect
+        with:
+          api-key: bogus
+          url: https://connect.example.org
