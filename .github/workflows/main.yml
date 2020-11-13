@@ -6,7 +6,7 @@ on:
     branches: [main]
 jobs:
   main:
-    runs-on: ${{ matrix.config.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
