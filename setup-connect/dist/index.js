@@ -3026,7 +3026,7 @@ async function ensureRsconnect(rVersion) {
     }
     return await exec.exec('Rscript', ['--version'])
         .then(async () => await exec.exec('Rscript', rscriptCommand('install.packages(\'remotes\')')))
-        .then(async () => await exec.exec('Rscript', rscriptCommand(`remotes::install_version('rsconnect', version = ${version})`)))
+        .then(async () => await exec.exec('Rscript', rscriptCommand(`remotes::install_version(\'rsconnect\', version = ${version})`)))
         .then(() => {
         core.info([
             style.greenBright.open,

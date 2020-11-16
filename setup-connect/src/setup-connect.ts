@@ -50,7 +50,7 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
       async () => await exec.exec(
         'Rscript',
         rscriptCommand(
-          `remotes::install_version('rsconnect', version = ${version})`
+          `remotes::install_version(\'rsconnect\', version = ${version})`
         )
       )
     )
