@@ -1,8 +1,8 @@
 import * as core from '@actions/core'
-import { setupConnect, loadArgs } from './setup-connect'
+import { connectPublish, loadArgs } from './connect-publish'
 
 export function run (): void {
-  setupConnect(loadArgs())
+  connectPublish(loadArgs())
     .catch((err: any) => {
       core.setFailed(err)
     })

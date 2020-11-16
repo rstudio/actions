@@ -19,25 +19,24 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loadArgs = exports.setupConnect = void 0;
+exports.loadArgs = exports.connectPublish = void 0;
 const url_1 = require("url");
 const core = __importStar(require("@actions/core"));
 class ActionArgs {
     constructor() {
         this.apiKey = '';
-        this.rsconnectPythonVersion = '';
+        this.directory = '';
         this.serverName = '';
+        this.contentType = '';
         this.url = '';
     }
 }
-async function setupConnect(args) {
-    // TODO: install rsconnect-python at specified version into tool
-    // cache
+async function connectPublish(args) {
+    // TODO: ensure server and then publish
 }
-exports.setupConnect = setupConnect;
+exports.connectPublish = connectPublish;
 function loadArgs() {
     const rawURL = core.getInput('url', { required: true });
-    const rsconnectPythonVersion = core.getInput('rsconnect-python-version');
     const serverName = core.getInput('server-name');
     let apiKey = core.getInput('api-key');
     const apiKeySpecified = apiKey !== '';
@@ -58,8 +57,9 @@ function loadArgs() {
     url.username = '';
     const args = new ActionArgs();
     args.apiKey = apiKey;
+    args.contentType = core.getInput('type');
+    args.directory = core.getInput('directory');
     args.url = url.toString();
-    args.rsconnectPythonVersion = rsconnectPythonVersion !== null && rsconnectPythonVersion !== void 0 ? rsconnectPythonVersion : 'latest';
     args.serverName = serverName !== null && serverName !== void 0 ? serverName : 'default';
     return args;
 }

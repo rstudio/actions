@@ -1,7 +1,23 @@
-import { setupConnect } from "../src/setup-connect";
+import { setupConnect, loadArgs } from "../src/setup-connect";
+
+describe("loadArgs", () => {
+  it("accepts rsconnect-python-version", () => {
+    process.env["INPUT_RSCONNECT-PYTHON-VERSION"] = "fancy";
+
+    const args = loadArgs();
+
+    expect(args.rsconnectPythonVersion).toBe("fancy");
+  });
+
+  it("defaults rsconnect-python-version to 'latest'", () => {
+    delete process.env["INPUT_RSCONNECT-PYTHON-VERSION"]
+    const args = loadArgs();
+
+    expect(args.rsconnectPythonVersion).toBe("latest");
+  });
+});
 
 describe("setupConnect", () => {
-  it("does nothing", async () => {
-    await setupConnect({ apiKey: "bogus", url: "https://connect.example.org" });
+  it.skip('ensures rsconnect-python is available', () => {
   });
 });

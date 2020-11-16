@@ -1,10 +1,17 @@
-import * as core from "@actions/core";
+import * as core from '@actions/core'
 
-interface ActionArgs {
-  apiKey: string;
-  url: string;
+class ActionArgs {
+  public rsconnectPythonVersion: string = ''
 }
 
-export async function setupConnect(args: ActionArgs): Promise<void> {
-  core.debug("not doing anything");
-};
+export async function setupConnect (args: ActionArgs): Promise<void> {
+  // TODO: install rsconnect-python at specified version into tool
+  // cache
+}
+
+export function loadArgs (): ActionArgs {
+  const rsconnectPythonVersion = core.getInput('rsconnect-python-version')
+  const args = new ActionArgs()
+  args.rsconnectPythonVersion = rsconnectPythonVersion === '' ? 'latest' : rsconnectPythonVersion
+  return args
+}
