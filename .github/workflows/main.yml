@@ -32,7 +32,31 @@ jobs:
         with:
           python-version: '3.x'
       - uses: ./setup-connect
+        with:
+          python: true
+          r: false
       - run: rsconnect version
+      - uses: r-lib/actions/setup-r@v1
+        with:
+          r-version: 3.6.3
+      - uses: ./setup-connect
+        with:
+          python: false
+          r: true
+      - run: Rscript --vanilla -e 'packageVersion("rsconnect")'
+  connect-publish:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
+      - run: Rscript --vanilla -e 'packageVersion("rsconnect")'
   connect-publish:
     runs-on: ${{ matrix.os }}
     strategy:

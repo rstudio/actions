@@ -2,6 +2,15 @@ name: Setup RStudio Connect environment
 description: Setup an environment to work with an RStudio Connect API
 author: RStudio Developers
 inputs:
+  r:
+    description: Install R packages
+    default: true
+  python:
+    description: Install Python packages
+    default: true
+  rsconnect-version:
+    description: Version of rsconnect R package to install
+    default: latest
   rsconnect-python-version:
     description: Version of rsconnect-python to install
     default: latest
