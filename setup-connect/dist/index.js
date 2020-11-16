@@ -3030,17 +3030,17 @@ async function ensureRsconnect(rVersion) {
         .then(() => {
         core.info([
             style.greenBright.open,
-            style.bold,
+            style.bold.open,
             'Installed rsconnect',
-            style.reset
+            style.reset.close
         ].join(''));
     })
         .catch((err) => {
         core.error([
             style.yellowBright.open,
-            style.bold,
+            style.bold.open,
             errInstallR,
-            style.reset
+            style.reset.close
         ].join(''));
         core.setFailed(err);
     });
@@ -3050,7 +3050,7 @@ function rscriptCommand(body) {
         '--vanilla',
         '-e',
         [
-            'options(repos("@CRAN@" = "https://cloud.r-project.org", CRAN = "https://cran.rstudio.com"))',
+            'options(repos = list("@CRAN@" = "https://cloud.r-project.org", CRAN = "https://cran.rstudio.com"))',
             body
         ].join(';')
     ];
@@ -3066,17 +3066,17 @@ async function ensureRSConnectPython(pyVersion) {
         .then(() => {
         core.info([
             style.greenBright.open,
-            style.bold,
+            style.bold.open,
             'Installed rsconnect-python, which is available as "rsconnect"',
-            style.reset
+            style.reset.close
         ].join(''));
     })
         .catch((err) => {
         core.error([
             style.yellowBright.open,
-            style.bold,
+            style.bold.open,
             errInstallPython,
-            style.reset
+            style.reset.close
         ].join(''));
         core.setFailed(err);
     });

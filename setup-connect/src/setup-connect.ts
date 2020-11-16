@@ -57,17 +57,17 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
     .then(() => {
       core.info([
         style.greenBright.open,
-        style.bold,
+        style.bold.open,
         'Installed rsconnect',
-        style.reset
+        style.reset.close
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
         style.yellowBright.open,
-        style.bold,
+        style.bold.open,
         errInstallR,
-        style.reset
+        style.reset.close
       ].join(''))
       core.setFailed(err)
     })
@@ -96,17 +96,17 @@ async function ensureRSConnectPython (pyVersion: string): Promise<any> {
     .then(() => {
       core.info([
         style.greenBright.open,
-        style.bold,
+        style.bold.open,
         'Installed rsconnect-python, which is available as "rsconnect"',
-        style.reset
+        style.reset.close
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
         style.yellowBright.open,
-        style.bold,
+        style.bold.open,
         errInstallPython,
-        style.reset
+        style.reset.close
       ].join(''))
       core.setFailed(err)
     })
