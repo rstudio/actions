@@ -1,15 +1,10 @@
-name: 'Setup RStudio Connect environment'
-description: 'Setup an environment to work with an RStudio Connect API'
+name: Setup RStudio Connect environment
+description: Setup an environment to work with an RStudio Connect API
 author: RStudio Developers
 inputs:
-  api-key:
-    description: 'API key generated in RStudio Connect'
-    default: ''
-  url:
-    description: 'RStudio Connect URL, optionally including an API key as username or password part'
   rsconnect-python-version:
-    description: 'Version of rsconnect-python to install'
-    default: 'latest'
+    description: Version of rsconnect-python to install
+    default: latest
 runs:
-  using: 'node12'
-  main: 'dist/main.js'
+  using: node12
+  main: dist/main.js

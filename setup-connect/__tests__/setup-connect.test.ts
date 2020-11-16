@@ -1,38 +1,23 @@
 import { setupConnect, loadArgs } from "../src/setup-connect";
 
 describe("loadArgs", () => {
-  it("accepts valid URL and api-key", () => {
-    process.env["INPUT_API-KEY"] = "bogus";
-    process.env["INPUT_URL"] = "https://connect.example.org";
+  it("accepts rsconnect-python-version", () => {
+    process.env["INPUT_RSCONNECT-PYTHON-VERSION"] = "fancy";
 
     const args = loadArgs();
 
-    expect(args.url).toBe("https://connect.example.org/");
-    expect(args.apiKey).toBe("bogus");
+    expect(args.rsconnectPythonVersion).toBe("fancy");
   });
 
-  it("accepts api-key as username in URL", () => {
-    process.env["INPUT_API-KEY"] = "bogus";
-    process.env["INPUT_URL"] = "https://gnarly@connect.example.org";
-
+  it("defaults rsconnect-python-version to 'latest'", () => {
+    delete process.env["INPUT_RSCONNECT-PYTHON-VERSION"]
     const args = loadArgs();
 
-    expect(args.url).toBe("https://connect.example.org/");
-    expect(args.apiKey).toBe("gnarly");
-  });
-
-  it("accepts api-key as password in URL", () => {
-    process.env["INPUT_API-KEY"] = "bogus";
-    process.env["INPUT_URL"] = "https://discarded:radical@connect.example.org";
-
-    const args = loadArgs();
-
-    expect(args.url).toBe("https://connect.example.org/");
-    expect(args.apiKey).toBe("radical");
+    expect(args.rsconnectPythonVersion).toBe("latest");
   });
 });
 
 describe("setupConnect", () => {
-  it('ensures rsconnect-python is available', () => {
+  it.skip('ensures rsconnect-python is available', () => {
   });
 });
