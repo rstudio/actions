@@ -12,6 +12,8 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
@@ -25,7 +27,12 @@ jobs:
         working-directory: setup-connect
       - run: yarn test
         working-directory: setup-connect
+      - run: git diff --exit-code --ignore-all-space
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
       - uses: ./setup-connect
+      - run: rsconnect version
   connect-publish:
     runs-on: ${{ matrix.os }}
     strategy:

@@ -6,14 +6,14 @@ describe("loadArgs", () => {
 
     const args = loadArgs();
 
-    expect(args.rsconnectPythonVersion).toBe("fancy");
+    expect(args.version).toBe("fancy");
   });
 
   it("defaults rsconnect-python-version to 'latest'", () => {
     delete process.env["INPUT_RSCONNECT-PYTHON-VERSION"]
     const args = loadArgs();
 
-    expect(args.rsconnectPythonVersion).toBe("latest");
+    expect(args.version).toBe("latest");
   });
 });
 
