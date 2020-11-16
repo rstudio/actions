@@ -27,7 +27,7 @@ jobs:
         working-directory: setup-connect
       - run: yarn test
         working-directory: setup-connect
-      - run: git diff --exit-code
+      - run: git diff --exit-code --ignore-all-space
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
