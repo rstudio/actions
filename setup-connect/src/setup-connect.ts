@@ -12,6 +12,6 @@ export async function setupConnect (args: ActionArgs): Promise<void> {
 export function loadArgs (): ActionArgs {
   const rsconnectPythonVersion = core.getInput('rsconnect-python-version')
   const args = new ActionArgs()
-  args.rsconnectPythonVersion = rsconnectPythonVersion ? rsconnectPythonVersion : 'latest'
+  args.rsconnectPythonVersion = rsconnectPythonVersion === '' ? 'latest' : rsconnectPythonVersion
   return args
 }
