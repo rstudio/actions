@@ -43,7 +43,7 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
     .then(
       async () => await exec.exec(
         'Rscript',
-        rscriptCommand(`install.packages('remotes')`)
+        rscriptCommand('install.packages(\'remotes\')')
       )
     )
     .then(
@@ -78,7 +78,7 @@ function rscriptCommand (body: string): string[] {
     '--vanilla',
     '-e',
     [
-      `options(repos = list('@CRAN@' = 'https://cloud.r-project.org', CRAN = 'https://cran.rstudio.com'))`,
+      'options(repos = list(\'@CRAN@\' = \'https://cloud.r-project.org\', CRAN = \'https://cran.rstudio.com\'))',
       body
     ].join(';')
   ]
