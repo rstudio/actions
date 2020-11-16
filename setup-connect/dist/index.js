@@ -3022,11 +3022,11 @@ exports.setupConnect = setupConnect;
 async function ensureRsconnect(rVersion) {
     let version = 'NULL';
     if (rVersion !== 'latest') {
-        version = `"${rVersion}"`;
+        version = `'${rVersion}'`;
     }
     return await exec.exec('Rscript', ['--version'])
-        .then(async () => await exec.exec('Rscript', rscriptCommand('install.packages("remotes")')))
-        .then(async () => await exec.exec('Rscript', rscriptCommand(`remotes::install_version("rsconnect", version = ${version})`)))
+        .then(async () => await exec.exec('Rscript', rscriptCommand(`install.packages('remotes')`)))
+        .then(async () => await exec.exec('Rscript', rscriptCommand(`remotes::install_version('rsconnect', version = ${version})`)))
         .then(() => {
         core.info([
             style.greenBright.open,
@@ -3050,7 +3050,7 @@ function rscriptCommand(body) {
         '--vanilla',
         '-e',
         [
-            "options(repos = list('@CRAN@' = 'https://cloud.r-project.org', CRAN = 'https://cran.rstudio.com'))",
+            `options(repos = list('@CRAN@' = 'https://cloud.r-project.org', CRAN = 'https://cran.rstudio.com'))`,
             body
         ].join(';')
     ];

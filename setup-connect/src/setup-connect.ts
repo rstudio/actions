@@ -36,21 +36,21 @@ export async function setupConnect (args: ActionArgs): Promise<any> {
 async function ensureRsconnect (rVersion: string): Promise<any> {
   let version = 'NULL'
   if (rVersion !== 'latest') {
-    version = `"${rVersion}"`
+    version = `'${rVersion}'`
   }
 
   return await exec.exec('Rscript', ['--version'])
     .then(
       async () => await exec.exec(
         'Rscript',
-        rscriptCommand('install.packages("remotes")')
+        rscriptCommand(`install.packages('remotes')`)
       )
     )
     .then(
       async () => await exec.exec(
         'Rscript',
         rscriptCommand(
-          `remotes::install_version("rsconnect", version = ${version})`
+          `remotes::install_version('rsconnect', version = ${version})`
         )
       )
     )
@@ -78,7 +78,7 @@ function rscriptCommand (body: string): string[] {
     '--vanilla',
     '-e',
     [
-      "options(repos = list('@CRAN@' = 'https://cloud.r-project.org', CRAN = 'https://cran.rstudio.com'))",
+      `options(repos = list('@CRAN@' = 'https://cloud.r-project.org', CRAN = 'https://cran.rstudio.com'))`,
       body
     ].join(';')
   ]
