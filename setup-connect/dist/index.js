@@ -3010,16 +3010,16 @@ async function setupConnect(args) {
         .then(async () => await exec.exec('python', ['-m', 'pip', 'install', spec]))
         .then(() => {
         core.info([
-            style.green.open,
+            style.greenBright.open,
             'Installed rsconnect-python, which is available as "rsconnect"',
-            style.green.close
+            style.greenBright.close
         ].join(''));
     })
         .catch((err) => {
         core.error([
-            style.yellow.open,
+            style.yellowBright.open,
             errInstallPython,
-            style.yellow.close
+            style.yellowBright.close
         ].join(''));
         core.setFailed(err);
     });
