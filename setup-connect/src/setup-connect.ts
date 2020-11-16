@@ -43,30 +43,45 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
     .then(
       async () => await exec.exec(
         'Rscript',
-        ['--vanilla', '-e', 'install.packages("remotes")']
+        rscriptCommand('install.packages("remotes")')
       )
     )
     .then(
       async () => await exec.exec(
         'Rscript',
-        ['--vanilla', '-e', `remotes::install_version("rsconnect", version = ${version})`]
+        rscriptCommand(
+          `remotes::install_version("rsconnect", version = ${version})`
+        )
       )
     )
     .then(() => {
       core.info([
         style.greenBright.open,
+        style.bold,
         'Installed rsconnect',
-        style.greenBright.close
+        style.reset
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
         style.yellowBright.open,
+        style.bold,
         errInstallR,
-        style.yellowBright.close
+        style.reset
       ].join(''))
       core.setFailed(err)
     })
+}
+
+function rscriptCommand (body: string): string[] {
+  return [
+    '--vanilla',
+    '-e',
+    [
+      'options(repos("@CRAN@" = "https://cloud.r-project.org", CRAN = "https://cran.rstudio.com"))',
+      body
+    ].join(';')
+  ]
 }
 
 async function ensureRSConnectPython (pyVersion: string): Promise<any> {
@@ -81,15 +96,17 @@ async function ensureRSConnectPython (pyVersion: string): Promise<any> {
     .then(() => {
       core.info([
         style.greenBright.open,
+        style.bold,
         'Installed rsconnect-python, which is available as "rsconnect"',
-        style.greenBright.close
+        style.reset
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
         style.yellowBright.open,
+        style.bold,
         errInstallPython,
-        style.yellowBright.close
+        style.reset
       ].join(''))
       core.setFailed(err)
     })
