@@ -56,19 +56,6 @@ jobs:
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
-      - run: Rscript --vanilla -e 'packageVersion("rsconnect")'
-  connect-publish:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2-beta
-        with:
-          node-version: '12'
       - run: yarn install
         working-directory: connect-publish
       - run: yarn lint
