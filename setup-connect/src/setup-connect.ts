@@ -1,5 +1,6 @@
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
+import * as style from 'ansi-styles'
 
 class ActionArgs {
   public version: string = ''
@@ -11,7 +12,6 @@ const errInstallPython = [
 ].join(' ')
 
 export async function setupConnect (args: ActionArgs): Promise<any> {
-  // TODO: install rsconnect-python at specified version into tool cache
   let spec = 'rsconnect-python'
   if (args.version !== 'latest') {
     spec = `${spec}==${args.version}`
@@ -21,10 +21,18 @@ export async function setupConnect (args: ActionArgs): Promise<any> {
     .then(async () => await exec.exec('python', ['-m', 'ensurepip', '--default-pip']))
     .then(async () => await exec.exec('python', ['-m', 'pip', 'install', spec]))
     .then(() => {
-      core.info('installed rsconnect-python, which is available as "rsconnect"')
+      core.info([
+        style.green.open,
+        'Installed rsconnect-python, which is available as "rsconnect"',
+        style.green.close
+      ].join(''))
     })
     .catch((err: any) => {
-      core.error(errInstallPython)
+      core.error([
+        style.yellow.open,
+        errInstallPython,
+        style.yellow.close
+      ].join(''))
       core.setFailed(err)
     })
 }
