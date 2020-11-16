@@ -21,12 +21,13 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.run = void 0;
 const core = __importStar(require("@actions/core"));
-const setup_connect_1 = require("./setup-connect");
+const connect_publish_1 = require("./connect-publish");
 function run() {
-    setup_connect_1.setupConnect(setup_connect_1.loadArgs())
+    connect_publish_1.connectPublish(connect_publish_1.loadArgs())
         .catch((err) => {
         core.setFailed(err);
     });
 }
 exports.run = run;
+;
 run();

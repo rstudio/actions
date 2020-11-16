@@ -1,0 +1,17 @@
+name: Publish to RStudio Connect
+description: Publish to RStudio Connect via the rsconnect CLI
+author: RStudio Developers
+inputs:
+  api-key:
+    description: API key generated in RStudio Connect
+    default: ''
+  directory:
+    description: Directory containing the content or app to publish
+    default: .
+  type:
+    description: The type of content or app to publish
+  url:
+    description: RStudio Connect URL, optionally including an API key as username or password part
+runs:
+  using: node12
+  main: dist/main.js

@@ -3,19 +3,18 @@ import * as core from '@actions/core'
 
 class ActionArgs {
   public apiKey: string = ''
-  public rsconnectPythonVersion: string = ''
+  public directory: string = ''
   public serverName: string = ''
+  public contentType: string = ''
   public url: string = ''
 }
 
-export async function setupConnect (args: ActionArgs): Promise<void> {
-  // TODO: install rsconnect-python at specified version into tool
-  // cache
+export async function connectPublish (args: ActionArgs): Promise<void> {
+  // TODO: ensure server and then publish
 }
 
 export function loadArgs (): ActionArgs {
   const rawURL = core.getInput('url', { required: true })
-  const rsconnectPythonVersion = core.getInput('rsconnect-python-version')
   const serverName = core.getInput('server-name')
 
   let apiKey = core.getInput('api-key')
@@ -39,8 +38,9 @@ export function loadArgs (): ActionArgs {
   const args = new ActionArgs()
 
   args.apiKey = apiKey
+  args.contentType = core.getInput('type')
+  args.directory = core.getInput('directory')
   args.url = url.toString()
-  args.rsconnectPythonVersion = rsconnectPythonVersion ?? 'latest'
   args.serverName = serverName ?? 'default'
 
   return args

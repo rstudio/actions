@@ -1,4 +1,4 @@
-import { setupConnect, loadArgs } from "../src/setup-connect";
+import { connectPublish, loadArgs } from "../src/connect-publish";
 
 describe("loadArgs", () => {
   it("accepts valid URL and api-key", () => {
@@ -32,7 +32,7 @@ describe("loadArgs", () => {
   });
 });
 
-describe("setupConnect", () => {
-  it('ensures rsconnect-python is available', () => {
+describe("connectPublish", () => {
+  it.skip("publishes to connect", () => {
   });
 });

@@ -19,11 +19,34 @@ jobs:
           node-version: '12'
       - run: yarn install
         working-directory: setup-connect
+      - run: yarn lint
+        working-directory: setup-connect
       - run: yarn build
         working-directory: setup-connect
       - run: yarn test
         working-directory: setup-connect
       - uses: ./setup-connect
+  connect-publish:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '12'
+      - run: yarn install
+        working-directory: connect-publish
+      - run: yarn lint
+        working-directory: connect-publish
+      - run: yarn build
+        working-directory: connect-publish
+      - run: yarn test
+        working-directory: connect-publish
+      - uses: ./connect-publish
         with:
           api-key: bogus
           url: https://connect.example.org
