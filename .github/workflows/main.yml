@@ -45,7 +45,7 @@ jobs:
         with:
           python: false
           r: true
-      - run: Rscript --vanilla -e 'packageVersion("rsconnect")'
+      - run: Rscript --vanilla -e "packageVersion('rsconnect')"
   connect-publish:
     runs-on: ${{ matrix.os }}
     strategy:
