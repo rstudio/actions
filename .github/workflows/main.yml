@@ -30,6 +30,7 @@ jobs:
         with:
           python-version: '3.x'
       - uses: ./setup-connect
+      - run: rsconnect version
   connect-publish:
     runs-on: ${{ matrix.os }}
     strategy:
