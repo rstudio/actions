@@ -2993,17 +2993,74 @@ const exec = __importStar(__webpack_require__(514));
 const style = __importStar(__webpack_require__(68));
 class ActionArgs {
     constructor() {
-        this.version = '';
+        this.pyRuntime = false;
+        this.pyVersion = '';
+        this.rRuntime = false;
+        this.rVersion = '';
     }
 }
 const errInstallPython = [
     'Please ensure python is available, such as by running a',
     'step with "uses: actions/setup-python@v2" prior to this step.'
 ].join(' ');
+const errInstallR = [
+    'Please ensure R is available, such as by running a step',
+    'with "uses: r-lib/actions/setup-r@v1" prior to this step.'
+].join(' ');
 async function setupConnect(args) {
+    if (!args.rRuntime && !args.pyRuntime) {
+        throw new Error('no runtimes specified');
+    }
+    if (args.rRuntime) {
+        await ensureRsconnect(args.rVersion);
+    }
+    if (args.pyRuntime) {
+        await ensureRSConnectPython(args.pyVersion);
+    }
+}
+exports.setupConnect = setupConnect;
+async function ensureRsconnect(rVersion) {
+    let version = 'NULL';
+    if (rVersion !== 'latest') {
+        version = `'${rVersion}'`;
+    }
+    return await exec.exec('Rscript', ['--version'])
+        .then(async () => await exec.exec('Rscript', rscriptCommand('install.packages(\'remotes\')')))
+        .then(async () => await exec.exec('Rscript', rscriptCommand(
+    // eslint-disable-next-line no-useless-escape
+    `remotes::install_version(\'rsconnect\', version = ${version})`)))
+        .then(() => {
+        core.info([
+            style.greenBright.open,
+            style.bold.open,
+            'Installed rsconnect',
+            style.reset.close
+        ].join(''));
+    })
+        .catch((err) => {
+        core.error([
+            style.yellowBright.open,
+            style.bold.open,
+            errInstallR,
+            style.reset.close
+        ].join(''));
+        core.setFailed(err);
+    });
+}
+function rscriptCommand(body) {
+    return [
+        '--vanilla',
+        '-e',
+        [
+            'options(repos = list(\'@CRAN@\' = \'https://cloud.r-project.org\', CRAN = \'https://cran.rstudio.com\'))',
+            body
+        ].join(';')
+    ];
+}
+async function ensureRSConnectPython(pyVersion) {
     let spec = 'rsconnect-python';
-    if (args.version !== 'latest') {
-        spec = `${spec}==${args.version}`;
+    if (pyVersion !== 'latest') {
+        spec = `${spec}==${pyVersion}`;
     }
     return await exec.exec('python', ['--version'])
         .then(async () => await exec.exec('python', ['-m', 'ensurepip', '--default-pip']))
@@ -3011,24 +3068,29 @@ async function setupConnect(args) {
         .then(() => {
         core.info([
             style.greenBright.open,
+            style.bold.open,
             'Installed rsconnect-python, which is available as "rsconnect"',
-            style.greenBright.close
+            style.reset.close
         ].join(''));
     })
         .catch((err) => {
         core.error([
             style.yellowBright.open,
+            style.bold.open,
             errInstallPython,
-            style.yellowBright.close
+            style.reset.close
         ].join(''));
         core.setFailed(err);
     });
 }
-exports.setupConnect = setupConnect;
 function loadArgs() {
-    const version = core.getInput('rsconnect-python-version');
+    const rVersion = core.getInput('rsconnect-version');
+    const pyVersion = core.getInput('rsconnect-python-version');
     const args = new ActionArgs();
-    args.version = version === '' ? 'latest' : version;
+    args.pyRuntime = core.getInput('python') === 'true';
+    args.pyVersion = pyVersion === '' ? 'latest' : pyVersion;
+    args.rRuntime = core.getInput('r') === 'true';
+    args.rVersion = rVersion === '' ? 'latest' : rVersion;
     return args;
 }
 exports.loadArgs = loadArgs;
