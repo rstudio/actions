@@ -4,9 +4,8 @@ author: RStudio Developers
 inputs:
   api-key:
     description: API key generated in RStudio Connect
-    default: ''
-  directory:
-    description: Directory containing the content or app to publish
+  dir:
+    description: Directory or directories containing the content or app to publish, separated by newlines
     default: .
   type:
     description: The type of content or app to publish
