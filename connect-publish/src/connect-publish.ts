@@ -89,6 +89,5 @@ export function loadArgs (): ActionArgs {
   args.serverName = serverName
   args.url = url.toString()
 
-  console.log('args=%o', args)
   return args
 }
