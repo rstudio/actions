@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "RStudio Connect publish action",
-  "main": "dist/main.js",
+  "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/main.ts",
     "lint": "ts-standard --fix",

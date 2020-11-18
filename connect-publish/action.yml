@@ -13,4 +13,4 @@ inputs:
     description: RStudio Connect URL, optionally including an API key as username or password part
 runs:
   using: node12
-  main: dist/main.js
+  main: dist/index.js
