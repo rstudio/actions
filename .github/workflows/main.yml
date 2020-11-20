@@ -66,7 +66,13 @@ jobs:
         working-directory: connect-publish
       - run: yarn test
         working-directory: connect-publish
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - uses: ./setup-connect
+        with:
+          r: false
       - uses: ./connect-publish
         with:
-          api-key: bogus
-          url: https://connect.example.org
+          url: http://bogus@connect.example.org
+        continue-on-error: true
