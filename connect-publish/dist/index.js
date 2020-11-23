@@ -1653,7 +1653,6 @@ function loadArgs() {
     args.dirs = dirs;
     args.serverName = serverName;
     args.url = url.toString();
-    console.log('args=%o', args);
     return args;
 }
 exports.loadArgs = loadArgs;
