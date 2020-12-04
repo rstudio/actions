@@ -70,7 +70,7 @@ jobs:
         working-directory: connect-publish
       - uses: ./connect-publish
         with:
-          url: http://127.0.0.1:23939
+          url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
           dir: |
             ./connect-publish/__tests__/apps/plumber
             ./connect-publish/__tests__/apps/flask
