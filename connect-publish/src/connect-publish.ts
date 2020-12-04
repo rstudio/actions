@@ -1,6 +1,7 @@
+import path from 'path'
 import { URL } from 'url'
 import * as core from '@actions/core'
-import * as exec from '@actions/exec'
+import * as rsconnect from 'rsconnect-ts'
 
 class ActionArgs {
   public apiKey: string = ''
@@ -9,16 +10,21 @@ class ActionArgs {
   public url: string = ''
 }
 
+interface publishResult {
+  dir: string
+  success: boolean
+}
+
 export async function connectPublish (args: ActionArgs): Promise<any> {
-  return await addServer(args).then((rc: number) => {
-    if (rc !== 0) {
-      throw new Error('non-zero exit from rsconnect add')
-    }
-  })
-    .then(async () => await publishFromDirs(args.dirs, args.serverName))
-    .then((rcs: number[]) => {
-      if (rcs.some((rc: number) => rc !== 0)) {
-        throw new Error('non-zero exit from at least one publish')
+  const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL: args.url })
+  await client.serverSettings()
+
+  return await publishFromDirs(client, args.dirs)
+    .then((results: publishResult[]) => {
+      const failed = results.filter((res: publishResult) => !res.success)
+      if (failed.length > 0) {
+        const failedDirs = failed.map((res: publishResult) => res.dir)
+        throw new Error(`unsuccessful publish of dirs=${failedDirs.join(', ')}`)
       }
     })
     .catch((err: any) => {
@@ -26,30 +32,38 @@ export async function connectPublish (args: ActionArgs): Promise<any> {
     })
 }
 
-async function addServer (args: ActionArgs): Promise<number> {
-  return await exec.exec('rsconnect', [
-    'add',
-    '--name', args.serverName,
-    '--server', args.url,
-    '--api-key', args.apiKey
-  ], { silent: true })
-}
-
-async function publishFromDirs (dirs: string[], serverName: string): Promise<number[]> {
-  const ret: number[] = []
+async function publishFromDirs (client: rsconnect.APIClient, dirs: string[]): Promise<publishResult[]> {
+  const ret: publishResult[] = []
   for (const dir of dirs) {
-    ret.push(await publishFromDir(dir, serverName))
+    ret.push(await publishFromDir(client, dir))
   }
   return ret
 }
 
-async function publishFromDir (dir: string, serverName: string): Promise<number> {
-  return await exec.exec('rsconnect', [
-    'deploy',
-    'manifest',
-    '--name', serverName,
-    dir
-  ])
+async function publishFromDir (client: rsconnect.APIClient, dir: string): Promise<publishResult> {
+  const deployer = new rsconnect.Deployer(client)
+  return deployer.deployManifest(path.join(dir, 'manifest.json'), dir)
+    .then((resp: rsconnect.DeployTaskResponse) => {
+      return new rsconnect.ClientTaskPoller(client, resp.taskId)
+    })
+    .then(async (poller: rsconnect.ClientTaskPoller) => {
+      for await (const result of poller.poll()) {
+        for (const line of result.status) {
+          core.info(line)
+        }
+      }
+      return {
+        dir,
+        success: true
+      }
+    })
+    .catch((err: any) => {
+      core.error(err as Error)
+      return {
+        dir,
+        success: false
+      }
+    })
 }
 
 export function loadArgs (): ActionArgs {

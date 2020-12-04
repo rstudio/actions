@@ -66,13 +66,17 @@ jobs:
         working-directory: connect-publish
       - run: yarn test
         working-directory: connect-publish
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - uses: ./setup-connect
-        with:
-          r: false
+      - run: docker-compose up -d
+        working-directory: connect-publish
       - uses: ./connect-publish
         with:
-          url: http://bogus@connect.example.org
-        continue-on-error: true
+          url: http://127.0.0.1:23939
+          dir: |
+            ./connect-publish/__tests__/apps/plumber
+            ./connect-publish/__tests__/apps/flask
+      - if: failure()
+        run: docker-compose logs
+        working-directory: connect-publish
+      - if: always()
+        run: docker-compose down --remove-orphans
+        working-directory: connect-publish

@@ -1,0 +1,5 @@
+{
+    "javascript.validate.enable": false,
+    "standard.autoFixOnSave": true,
+    "standard.engine": "ts-standard"
+}
