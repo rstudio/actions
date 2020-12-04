@@ -48,6 +48,8 @@ jobs:
       - run: Rscript --vanilla -e "packageVersion('rsconnect')"
   connect-publish:
     runs-on: ${{ matrix.os }}
+    env:
+      RSC_LICENSE: ${{ secrets.RSC_LICENSE }}
     strategy:
       fail-fast: false
       matrix:
