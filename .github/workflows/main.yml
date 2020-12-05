@@ -14,19 +14,18 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+    defaults:
+      run:
+        working-directory: setup-connect
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: setup-connect
       - run: yarn lint
-        working-directory: setup-connect
       - run: yarn build
-        working-directory: setup-connect
       - run: yarn test
-        working-directory: setup-connect
       - run: git diff --exit-code --ignore-all-space
       - uses: actions/setup-python@v2
         with:
@@ -55,21 +54,19 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+    defaults:
+      run:
+        working-directory: connect-publish
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: connect-publish
       - run: yarn lint
-        working-directory: connect-publish
       - run: yarn build
-        working-directory: connect-publish
       - run: yarn test
-        working-directory: connect-publish
       - run: docker-compose up -d
-        working-directory: connect-publish
       - run: |
           curl -o wait-for -fsSL https://raw.githubusercontent.com/eficode/wait-for/master/wait-for && \
           chmod +x wait-for
@@ -87,7 +84,5 @@ jobs:
             ./connect-publish/__tests__/apps/flask
       - if: failure()
         run: docker-compose logs
-        working-directory: connect-publish
       - if: always()
         run: docker-compose down --remove-orphans
-        working-directory: connect-publish
