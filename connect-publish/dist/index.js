@@ -15524,13 +15524,13 @@ function loadArgs() {
     const url = new url_1.URL(rawURL);
     if (url.password !== '') {
         if (apiKeySpecified) {
-            core.warning('using api key from URL password instead of api-key input');
+            core.info('using api key from URL password instead of api-key input');
         }
         apiKey = url.password;
     }
     else if (url.username !== '') {
         if (apiKeySpecified) {
-            core.warning('using api key from URL username instead of api-key input');
+            core.info('using api key from URL username instead of api-key input');
         }
         apiKey = url.username;
     }
