@@ -15447,19 +15447,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.loadArgs = exports.connectPublish = void 0;
+exports.loadArgs = exports.connectPublish = exports.ConnectPublishErrorResult = void 0;
 const path_1 = __importDefault(__webpack_require__(5622));
 const url_1 = __webpack_require__(8835);
 const core = __importStar(__webpack_require__(2186));
 const rsconnect = __importStar(__webpack_require__(5943));
-class ActionArgs {
-    constructor() {
-        this.apiKey = '';
-        this.dirs = [];
-        this.serverName = '';
-        this.url = '';
+class ConnectPublishErrorResult extends Error {
+    constructor(msg, results) {
+        super(msg);
+        this.results = results;
     }
 }
+exports.ConnectPublishErrorResult = ConnectPublishErrorResult;
 async function connectPublish(args) {
     const baseURL = `${args.url.replace(/\/+$/, '')}/__api__`;
     core.debug(`using base URL ${baseURL}`);
@@ -15470,14 +15469,16 @@ async function connectPublish(args) {
         const failed = results.filter((res) => !res.success);
         if (failed.length > 0) {
             const failedDirs = failed.map((res) => res.dir);
-            throw new Error(`unsuccessful publish of dirs=${failedDirs.join(', ')}`);
+            throw new ConnectPublishErrorResult(`unsuccessful publish of dirs=${failedDirs.join(', ')}`, results);
         }
+        return results;
     })
         .catch((err) => {
         if (core.isDebug()) {
             console.trace(err);
         }
         core.setFailed(err);
+        return err.results;
     });
 }
 exports.connectPublish = connectPublish;
@@ -15496,32 +15497,27 @@ async function publishFromDir(client, deployer, dir) {
         return new rsconnect.ClientTaskPoller(client, resp.taskId);
     })
         .then(async (poller) => {
+        let success = true;
         for await (const result of poller.poll()) {
+            core.debug(`received poll result: ${JSON.stringify(result)}`);
             for (const line of result.status) {
                 core.info(line);
             }
+            if (result.type === 'build-failed-error') {
+                success = false;
+            }
         }
-        return {
-            dir,
-            success: true
-        };
+        return { dir, success };
     })
         .catch((err) => {
         if (core.isDebug()) {
             console.trace(err);
         }
         core.error(err);
-        return {
-            dir,
-            success: false
-        };
+        return { dir, success: false };
     });
 }
 function loadArgs() {
-    let serverName = core.getInput('server-name');
-    if (serverName === '' || serverName === undefined || serverName === null) {
-        serverName = 'default';
-    }
     let apiKey = core.getInput('api-key');
     const apiKeySpecified = apiKey !== '';
     const rawURL = core.getInput('url', { required: true });
@@ -15544,12 +15540,11 @@ function loadArgs() {
     if (dirs.length === 0) {
         dirs.push('.');
     }
-    const args = new ActionArgs();
-    args.apiKey = apiKey;
-    args.dirs = dirs;
-    args.serverName = serverName;
-    args.url = url.toString();
-    return args;
+    return {
+        apiKey,
+        dirs,
+        url: url.toString()
+    };
 }
 exports.loadArgs = loadArgs;
 

@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/main.ts",
-    "lint": "ts-standard --fix ./src/**/*.ts",
+    "lint": "ts-standard --fix ./src/**/*.ts ./__tests__/*.ts",
     "test": "jest"
   },
   "repository": {
