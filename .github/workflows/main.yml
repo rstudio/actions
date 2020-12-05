@@ -73,7 +73,9 @@ jobs:
       - run: |
           curl -o wait-for -fsSL https://raw.githubusercontent.com/eficode/wait-for/master/wait-for && \
           chmod +x wait-for && \
-          ./wait-for 127.0.0.1:23939
+          ./wait-for 127.0.0.1:23939 == \
+            curl -H 'Authorization: Key ${{ secrets.RSTUDIO_CONNECT_API_KEY }}' \
+              http://127.0.0.1:23939/__api__/server_settings
       - uses: ./connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
