@@ -73,6 +73,8 @@ jobs:
       - run: |
           curl -o wait-for -fsSL https://raw.githubusercontent.com/eficode/wait-for/master/wait-for && \
           chmod +x wait-for
+      - run: sha1sum __tests__/rstudio-connect.test.gcfg
+      - run: docker-compose exec connect sha1sum /etc/rstudio-connect/rstudio-connect.gcfg
       - run: |
           ./wait-for 127.0.0.1:23939 -- \
             curl -L -vvv -H 'Authorization: Key ${{ secrets.RSTUDIO_CONNECT_API_KEY }}' \
