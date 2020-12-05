@@ -70,7 +70,7 @@ jobs:
       - run: ./__tests__/wait-for-connect
         env:
           RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
-      - uses: ./
+      - uses: ./connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
           dir: |
