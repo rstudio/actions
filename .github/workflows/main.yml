@@ -75,7 +75,7 @@ jobs:
           chmod +x wait-for
       - run: |
           ./wait-for 127.0.0.1:23939 -- \
-            curl -H 'Authorization: Key ${{ secrets.RSTUDIO_CONNECT_API_KEY }}' \
+            curl -L -vvv -H 'Authorization: Key ${{ secrets.RSTUDIO_CONNECT_API_KEY }}' \
               http://127.0.0.1:23939/__api__/server_settings
       - uses: ./connect-publish
         with:
