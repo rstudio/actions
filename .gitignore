@@ -1,6 +1,7 @@
 !/setup-connect/dist/index.js
 /connect-publish/__tests__/data
 /connect-publish/__tests__/pgdata
+wait-for
 
 *.lcov
 *.log
