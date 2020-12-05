@@ -1,4 +1,4 @@
-import { connectPublish, loadArgs } from "../src/connect-publish";
+import { loadArgs } from "../src/connect-publish";
 
 describe("loadArgs", () => {
   it("accepts valid URL and api-key", () => {

@@ -395,32 +395,551 @@ exports.toCommandValue = toCommandValue;
 
 /***/ }),
 
-/***/ 6545:
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+/***/ 5873:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(2618);
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.APIClient = void 0;
+const axios_1 = __importDefault(__webpack_require__(614));
+const fs_1 = __importDefault(__webpack_require__(5747));
+const conversions_1 = __webpack_require__(3301);
+class APIClient {
+    constructor(cfg) {
+        this.cfg = cfg;
+        this.client = axios_1.default.create({
+            baseURL: this.cfg.baseURL,
+            headers: {
+                Authorization: `Key ${this.cfg.apiKey}`
+            }
+        });
+    }
+    async createApp(appName) {
+        return await this.client.post('applications', { name: appName })
+            .then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async getApp(appID) {
+        return await this.client.get(`applications/${appID}`)
+            .then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async updateApp(appID, updates) {
+        return await this.client.post(`applications/${appID}`, updates)
+            .then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async updateAppVanityURL(appID, vanityURL) {
+        return await this.client.post(`applications/${appID}/vanities`, { app_id: appID, path_prefix: vanityURL }).then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async uploadApp(appID, bundle) {
+        return await this.client.post(`applications/${appID}/upload`, fs_1.default.createReadStream(bundle.tarballPath)).then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async deployApp(appID, bundleID) {
+        return await this.client.post(`applications/${appID}/deploy`, { bundle: bundleID }).then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async listApplications(params) {
+        return await this.client.get('applications', { params })
+            .then((resp) => {
+            const data = resp.data;
+            const { applications, count, total, continuation } = data;
+            return {
+                applications: applications.map(conversions_1.snake2camel),
+                count,
+                total,
+                continuation
+            };
+        });
+    }
+    async getTask(taskId, status) {
+        return await this.client.get(`tasks/${taskId}`, status !== null && status !== undefined
+            ? { params: { first_status: status } }
+            : undefined).then((resp) => conversions_1.snake2camel(resp.data));
+    }
+    async serverSettings(sub) {
+        let path = 'server_settings';
+        if (sub !== undefined) {
+            if (['python', 'r'].includes(sub)) {
+                path = `v1/server_settings/${sub}`;
+            }
+            else {
+                path = `server_settings/${sub}`;
+            }
+        }
+        return await this.client.get(path);
+    }
+}
+exports.APIClient = APIClient;
+
 
 /***/ }),
 
-/***/ 8104:
+/***/ 2585:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ApplicationPather = void 0;
+const path_1 = __importDefault(__webpack_require__(5622));
+const MiniGit_1 = __webpack_require__(8236);
+class ApplicationPather {
+    constructor() {
+        this.git = new MiniGit_1.MiniGit();
+    }
+    resolve(manifestPath, appPath) {
+        if (appPath !== null && appPath !== undefined) {
+            return this.strictAppPath(appPath);
+        }
+        if (manifestPath === null || manifestPath === undefined) {
+            return '';
+        }
+        const gitTopLevel = this.git.showTopLevel();
+        if (gitTopLevel === null) {
+            return this.strictAppPath(path_1.default.basename(path_1.default.dirname(manifestPath)));
+        }
+        const relPath = path_1.default.dirname(manifestPath).replace(gitTopLevel, '');
+        return this.strictAppPath(relPath);
+    }
+    strictAppPath(appPath) {
+        return ('/' +
+            appPath.trim().replace(/${path.sep}/g, '/') +
+            '/').replace(/\.\//g, '/').replace(/\/\//g, '/').replace(/_+/, '_');
+    }
+}
+exports.ApplicationPather = ApplicationPather;
+
+
+/***/ }),
+
+/***/ 3012:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Bundle = void 0;
+const tmp_1 = __importDefault(__webpack_require__(6155));
+if (process.env.DEBUG !== 'enabled') {
+    tmp_1.default.setGracefulCleanup();
+}
+class Bundle {
+    constructor(manifestPath, manifest) {
+        this.manifestPath = manifestPath;
+        this.manifest = manifest;
+        this.f = tmp_1.default.fileSync({
+            prefix: 'rsconnect-ts',
+            postfix: 'bundle.tar.gz'
+        });
+    }
+    get tarballPath() {
+        return this.f.name;
+    }
+}
+exports.Bundle = Bundle;
+
+
+/***/ }),
+
+/***/ 7510:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Bundler = void 0;
+const path_1 = __importDefault(__webpack_require__(5622));
+const tar_1 = __importDefault(__webpack_require__(132));
+const Bundle_1 = __webpack_require__(3012);
+const Manifest_1 = __webpack_require__(7847);
+class Bundler {
+    async fromManifest(manifestPath) {
+        const manifest = new Manifest_1.Manifest(manifestPath);
+        const bundle = new Bundle_1.Bundle(manifestPath, manifest);
+        const fileList = [
+            path_1.default.basename(manifestPath)
+        ].concat(Array.from(manifest.files.keys()));
+        await tar_1.default.create({ gzip: true, file: bundle.tarballPath, cwd: path_1.default.dirname(manifestPath) }, fileList);
+        return bundle;
+    }
+}
+exports.Bundler = Bundler;
+
+
+/***/ }),
+
+/***/ 6592:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ClientTaskPoller = void 0;
+class ClientTaskPoller {
+    constructor(client, taskId, sleepInterval) {
+        this.client = client;
+        this.taskId = taskId;
+        this.sleepInterval = (sleepInterval !== null && sleepInterval !== undefined
+            ? sleepInterval
+            : 500);
+    }
+    async *poll(timeout) {
+        var _a, _b;
+        const pollTimeout = (timeout !== null && timeout !== undefined
+            ? ((Date.now() / 1000 | 0) + timeout)
+            : Infinity);
+        let lastStatus;
+        while ((Date.now() / 1000 | 0) < pollTimeout) {
+            await this.sleepTick();
+            const curTask = await this.client.getTask(this.taskId, lastStatus);
+            yield {
+                status: curTask.status,
+                type: (_a = curTask.result) === null || _a === void 0 ? void 0 : _a.type,
+                data: (_b = curTask.result) === null || _b === void 0 ? void 0 : _b.data
+            };
+            lastStatus = curTask.lastStatus;
+            if (curTask.finished) {
+                return;
+            }
+        }
+    }
+    async sleepTick() {
+        return await new Promise((resolve) => {
+            setTimeout(() => resolve(), this.sleepInterval);
+        });
+    }
+}
+exports.ClientTaskPoller = ClientTaskPoller;
+
+
+/***/ }),
+
+/***/ 3074:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Deployer = void 0;
+const crypto_1 = __importDefault(__webpack_require__(6417));
+const url_1 = __webpack_require__(8835);
+const Bundler_1 = __webpack_require__(7510);
+const ListApplicationsPager_1 = __webpack_require__(5154);
+const ApplicationPather_1 = __webpack_require__(2585);
+class Deployer {
+    constructor(client) {
+        this.client = client;
+        this.bundler = new Bundler_1.Bundler();
+        this.pather = new ApplicationPather_1.ApplicationPather();
+    }
+    async deployManifest(manifestPath, appPath) {
+        return await this.deployBundle(await this.bundler.fromManifest(manifestPath), appPath);
+    }
+    async deployBundle(bundle, appPath) {
+        var _a;
+        const resolvedAppPath = this.pather.resolve(bundle.manifestPath, appPath);
+        let appID = null;
+        let app = null;
+        let reassignTitle = false;
+        if (resolvedAppPath !== '') {
+            // TODO: use an API that doesn't require scanning all applications, if possible
+            const existingApp = await this.findExistingApp(resolvedAppPath);
+            if (existingApp !== null) {
+                appID = existingApp.id;
+            }
+        }
+        const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
+        if (appID === null) {
+            const nameInput = (manifestTitle !== null && manifestTitle !== undefined
+                ? manifestTitle
+                : resolvedAppPath);
+            const appName = this.makeDeploymentName(nameInput);
+            app = await this.client.createApp(appName);
+            appID = app.id;
+            reassignTitle = true;
+        }
+        else {
+            app = await this.client.getApp(appID);
+        }
+        if (app == null) {
+            return await Promise.reject(new Error('unable to find or create app'));
+        }
+        if (!app.vanityUrl && resolvedAppPath !== '') {
+            await this.client.updateAppVanityURL(appID, resolvedAppPath);
+        }
+        if (manifestTitle !== undefined && manifestTitle !== null && reassignTitle) {
+            app.title = manifestTitle;
+            await this.client.updateApp(appID, { title: app.title });
+        }
+        const uploadedBundle = await this.client.uploadApp(appID, bundle);
+        return await this.client.deployApp(appID, uploadedBundle.id)
+            .then((ct) => {
+            const taskApp = app;
+            return {
+                taskId: ct.id,
+                appId: taskApp.id,
+                appGuid: taskApp.guid,
+                appUrl: taskApp.url,
+                title: (taskApp.title !== undefined && taskApp.title !== null
+                    ? taskApp.title
+                    : '')
+            };
+        });
+    }
+    async findExistingApp(appPath) {
+        let found = null;
+        const pager = new ListApplicationsPager_1.ListApplicationsPager(this.client);
+        for await (const app of pager.listApplications()) {
+            const currentAppPath = new url_1.URL(app.url).pathname;
+            if (currentAppPath === appPath) {
+                found = app;
+                break;
+            }
+        }
+        return found;
+    }
+    makeDeploymentName(title) {
+        if (title === null || title === undefined) {
+            title = 'unnamed ' + crypto_1.default.randomBytes(15).toString('base64');
+        }
+        let name = title.toLowerCase().replace(/ /g, '_');
+        name = name.replace(/[^A-Za-z0-9_ -]+/g, '');
+        name = name.replace(/_+/g, '_');
+        name = name.substring(0, 64);
+        if (name.length < 3) {
+            for (let i = name.length; i < 3; i++) {
+                name += '_';
+            }
+        }
+        return name;
+    }
+}
+exports.Deployer = Deployer;
+
+
+/***/ }),
+
+/***/ 5154:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ListApplicationsPager = void 0;
+const conversions_1 = __webpack_require__(3301);
+class ListApplicationsPager {
+    constructor(client) {
+        this.client = client;
+    }
+    async *listApplications(maxRecords) {
+        let resetMaxRecords = false;
+        if (maxRecords === undefined || maxRecords === null || maxRecords <= 0) {
+            maxRecords = Infinity;
+            resetMaxRecords = true;
+        }
+        let n = 0;
+        const pageParams = {
+            start: 0,
+            count: maxRecords < 100 ? maxRecords : 100,
+            cont: ''
+        };
+        while (pageParams.start < maxRecords) {
+            const page = await this.client.listApplications(pageParams);
+            if (n === 0) {
+                if (resetMaxRecords || maxRecords > page.total) {
+                    maxRecords = page.total;
+                }
+            }
+            for (let i = 0; i < page.applications.length; i++) {
+                if (n >= maxRecords) {
+                    return n;
+                }
+                n++;
+                yield conversions_1.snake2camel(page.applications[i]);
+            }
+            pageParams.cont = page.continuation;
+            pageParams.start += pageParams.count;
+        }
+        return n;
+    }
+}
+exports.ListApplicationsPager = ListApplicationsPager;
+
+
+/***/ }),
+
+/***/ 7847:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Manifest = void 0;
+const fs_1 = __importDefault(__webpack_require__(5747));
+const path_1 = __importDefault(__webpack_require__(5622));
+class Manifest {
+    constructor(source) {
+        this.source = source;
+        this.rawData = new Map();
+        const rawObject = JSON.parse(fs_1.default.readFileSync(this.source).toString('utf-8'));
+        for (const key in rawObject) {
+            this.rawData.set(key, rawObject[key]);
+        }
+    }
+    get files() {
+        const fileMap = new Map();
+        if (!this.rawData.has('files')) {
+            return fileMap;
+        }
+        const rawFiles = this.rawData.get('files');
+        Object.keys(rawFiles).forEach((key) => {
+            if (key === 'packrat/packrat.lock' || key.match(/^packrat\/desc\//) !== null) {
+                return;
+            }
+            fileMap.set(key, rawFiles[key]);
+        });
+        return fileMap;
+    }
+    get title() {
+        let filename = null;
+        if (this.rawData.has('metadata')) {
+            const metadata = this.rawData.get('metadata');
+            for (const prop of ['entrypoint', 'primary_rmd', 'primary_html']) {
+                const value = metadata[prop];
+                if (value !== null && value !== undefined && value !== '') {
+                    filename = value;
+                    break;
+                }
+            }
+            if ((filename === null || filename === void 0 ? void 0 : filename.match(/^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/)) !== null) {
+                filename = null;
+            }
+        }
+        if (filename == null) {
+            return null;
+        }
+        return this.defaultTitle(filename);
+    }
+    defaultTitle(fileName) {
+        return path_1.default.basename(path_1.default.resolve(process.cwd(), fileName));
+    }
+}
+exports.Manifest = Manifest;
+
+
+/***/ }),
+
+/***/ 8236:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.MiniGit = void 0;
+const child_process_1 = __importDefault(__webpack_require__(3129));
+class MiniGit {
+    showTopLevel() {
+        try {
+            const wt = child_process_1.default.execSync('git rev-parse --show-toplevel');
+            return wt.toString('utf-8').trim();
+        }
+        catch (_err) {
+            return null;
+        }
+    }
+}
+exports.MiniGit = MiniGit;
+
+
+/***/ }),
+
+/***/ 3301:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.snake2camel = void 0;
+function snake2camel(obj) {
+    if (typeof (obj) === 'string') {
+        return (obj).replace(/(_.)/, (match) => match.replace('_', '').toUpperCase());
+    }
+    const out = {};
+    Object.keys(obj).forEach((k) => {
+        const camelKey = snake2camel(k);
+        out[camelKey] = obj[k];
+    });
+    return out;
+}
+exports.snake2camel = snake2camel;
+
+
+/***/ }),
+
+/***/ 5943:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ListApplicationsPager = exports.Deployer = exports.ClientTaskPoller = exports.APIClient = void 0;
+var APIClient_1 = __webpack_require__(5873);
+Object.defineProperty(exports, "APIClient", ({ enumerable: true, get: function () { return APIClient_1.APIClient; } }));
+var ClientTaskPoller_1 = __webpack_require__(6592);
+Object.defineProperty(exports, "ClientTaskPoller", ({ enumerable: true, get: function () { return ClientTaskPoller_1.ClientTaskPoller; } }));
+var Deployer_1 = __webpack_require__(3074);
+Object.defineProperty(exports, "Deployer", ({ enumerable: true, get: function () { return Deployer_1.Deployer; } }));
+var ListApplicationsPager_1 = __webpack_require__(5154);
+Object.defineProperty(exports, "ListApplicationsPager", ({ enumerable: true, get: function () { return ListApplicationsPager_1.ListApplicationsPager; } }));
+
+
+/***/ }),
+
+/***/ 614:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+module.exports = __webpack_require__(3142);
+
+/***/ }),
+
+/***/ 4271:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var settle = __webpack_require__(3211);
-var buildFullPath = __webpack_require__(1934);
-var buildURL = __webpack_require__(646);
+var utils = __webpack_require__(7450);
+var settle = __webpack_require__(3733);
+var buildFullPath = __webpack_require__(5882);
+var buildURL = __webpack_require__(6656);
 var http = __webpack_require__(8605);
 var https = __webpack_require__(7211);
-var httpFollow = __webpack_require__(7707).http;
-var httpsFollow = __webpack_require__(7707).https;
+var httpFollow = __webpack_require__(9371).http;
+var httpsFollow = __webpack_require__(9371).https;
 var url = __webpack_require__(8835);
 var zlib = __webpack_require__(8761);
-var pkg = __webpack_require__(696);
-var createError = __webpack_require__(5226);
-var enhanceError = __webpack_require__(1516);
+var pkg = __webpack_require__(9843);
+var createError = __webpack_require__(3349);
+var enhanceError = __webpack_require__(2086);
 
 var isHttps = /https:?/;
 
@@ -697,20 +1216,20 @@ module.exports = function httpAdapter(config) {
 
 /***/ }),
 
-/***/ 3454:
+/***/ 1903:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var settle = __webpack_require__(3211);
-var cookies = __webpack_require__(1545);
-var buildURL = __webpack_require__(646);
-var buildFullPath = __webpack_require__(1934);
-var parseHeaders = __webpack_require__(6455);
-var isURLSameOrigin = __webpack_require__(3608);
-var createError = __webpack_require__(5226);
+var utils = __webpack_require__(7450);
+var settle = __webpack_require__(3733);
+var cookies = __webpack_require__(1186);
+var buildURL = __webpack_require__(6656);
+var buildFullPath = __webpack_require__(5882);
+var parseHeaders = __webpack_require__(318);
+var isURLSameOrigin = __webpack_require__(9119);
+var createError = __webpack_require__(3349);
 
 module.exports = function xhrAdapter(config) {
   return new Promise(function dispatchXhrRequest(resolve, reject) {
@@ -884,17 +1403,17 @@ module.exports = function xhrAdapter(config) {
 
 /***/ }),
 
-/***/ 2618:
+/***/ 3142:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var bind = __webpack_require__(7065);
-var Axios = __webpack_require__(8178);
-var mergeConfig = __webpack_require__(4831);
-var defaults = __webpack_require__(8190);
+var utils = __webpack_require__(7450);
+var bind = __webpack_require__(1646);
+var Axios = __webpack_require__(9245);
+var mergeConfig = __webpack_require__(8788);
+var defaults = __webpack_require__(66);
 
 /**
  * Create an instance of Axios
@@ -927,15 +1446,15 @@ axios.create = function create(instanceConfig) {
 };
 
 // Expose Cancel & CancelToken
-axios.Cancel = __webpack_require__(8875);
-axios.CancelToken = __webpack_require__(1587);
-axios.isCancel = __webpack_require__(4057);
+axios.Cancel = __webpack_require__(839);
+axios.CancelToken = __webpack_require__(6582);
+axios.isCancel = __webpack_require__(4051);
 
 // Expose all/spread
 axios.all = function all(promises) {
   return Promise.all(promises);
 };
-axios.spread = __webpack_require__(4850);
+axios.spread = __webpack_require__(553);
 
 module.exports = axios;
 
@@ -945,7 +1464,7 @@ module.exports.default = axios;
 
 /***/ }),
 
-/***/ 8875:
+/***/ 839:
 /***/ ((module) => {
 
 "use strict";
@@ -972,13 +1491,13 @@ module.exports = Cancel;
 
 /***/ }),
 
-/***/ 1587:
+/***/ 6582:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var Cancel = __webpack_require__(8875);
+var Cancel = __webpack_require__(839);
 
 /**
  * A `CancelToken` is an object that can be used to request cancellation of an operation.
@@ -1037,7 +1556,7 @@ module.exports = CancelToken;
 
 /***/ }),
 
-/***/ 4057:
+/***/ 4051:
 /***/ ((module) => {
 
 "use strict";
@@ -1050,17 +1569,17 @@ module.exports = function isCancel(value) {
 
 /***/ }),
 
-/***/ 8178:
+/***/ 9245:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var buildURL = __webpack_require__(646);
-var InterceptorManager = __webpack_require__(3214);
-var dispatchRequest = __webpack_require__(5062);
-var mergeConfig = __webpack_require__(4831);
+var utils = __webpack_require__(7450);
+var buildURL = __webpack_require__(6656);
+var InterceptorManager = __webpack_require__(2710);
+var dispatchRequest = __webpack_require__(8658);
+var mergeConfig = __webpack_require__(8788);
 
 /**
  * Create a new instance of Axios
@@ -1153,13 +1672,13 @@ module.exports = Axios;
 
 /***/ }),
 
-/***/ 3214:
+/***/ 2710:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 function InterceptorManager() {
   this.handlers = [];
@@ -1213,14 +1732,14 @@ module.exports = InterceptorManager;
 
 /***/ }),
 
-/***/ 1934:
+/***/ 5882:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var isAbsoluteURL = __webpack_require__(1301);
-var combineURLs = __webpack_require__(7189);
+var isAbsoluteURL = __webpack_require__(8819);
+var combineURLs = __webpack_require__(5787);
 
 /**
  * Creates a new URL by combining the baseURL with the requestedURL,
@@ -1241,13 +1760,13 @@ module.exports = function buildFullPath(baseURL, requestedURL) {
 
 /***/ }),
 
-/***/ 5226:
+/***/ 3349:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var enhanceError = __webpack_require__(1516);
+var enhanceError = __webpack_require__(2086);
 
 /**
  * Create an Error with the specified message, config, error code, request and response.
@@ -1267,16 +1786,16 @@ module.exports = function createError(message, config, code, request, response) 
 
 /***/ }),
 
-/***/ 5062:
+/***/ 8658:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var transformData = __webpack_require__(9812);
-var isCancel = __webpack_require__(4057);
-var defaults = __webpack_require__(8190);
+var utils = __webpack_require__(7450);
+var transformData = __webpack_require__(531);
+var isCancel = __webpack_require__(4051);
+var defaults = __webpack_require__(66);
 
 /**
  * Throws a `Cancel` if cancellation has been requested.
@@ -1354,7 +1873,7 @@ module.exports = function dispatchRequest(config) {
 
 /***/ }),
 
-/***/ 1516:
+/***/ 2086:
 /***/ ((module) => {
 
 "use strict";
@@ -1404,13 +1923,13 @@ module.exports = function enhanceError(error, config, code, request, response) {
 
 /***/ }),
 
-/***/ 4831:
+/***/ 8788:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 /**
  * Config-specific merge-function which creates a new config-object
@@ -1499,13 +2018,13 @@ module.exports = function mergeConfig(config1, config2) {
 
 /***/ }),
 
-/***/ 3211:
+/***/ 3733:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var createError = __webpack_require__(5226);
+var createError = __webpack_require__(3349);
 
 /**
  * Resolve or reject a Promise based on response status.
@@ -1532,13 +2051,13 @@ module.exports = function settle(resolve, reject, response) {
 
 /***/ }),
 
-/***/ 9812:
+/***/ 531:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 /**
  * Transform the data for a request or a response
@@ -1560,14 +2079,14 @@ module.exports = function transformData(data, headers, fns) {
 
 /***/ }),
 
-/***/ 8190:
+/***/ 66:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
-var normalizeHeaderName = __webpack_require__(6240);
+var utils = __webpack_require__(7450);
+var normalizeHeaderName = __webpack_require__(1737);
 
 var DEFAULT_CONTENT_TYPE = {
   'Content-Type': 'application/x-www-form-urlencoded'
@@ -1583,10 +2102,10 @@ function getDefaultAdapter() {
   var adapter;
   if (typeof XMLHttpRequest !== 'undefined') {
     // For browsers use XHR adapter
-    adapter = __webpack_require__(3454);
+    adapter = __webpack_require__(1903);
   } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
     // For node use HTTP adapter
-    adapter = __webpack_require__(8104);
+    adapter = __webpack_require__(4271);
   }
   return adapter;
 }
@@ -1666,7 +2185,7 @@ module.exports = defaults;
 
 /***/ }),
 
-/***/ 7065:
+/***/ 1646:
 /***/ ((module) => {
 
 "use strict";
@@ -1685,13 +2204,13 @@ module.exports = function bind(fn, thisArg) {
 
 /***/ }),
 
-/***/ 646:
+/***/ 6656:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 function encode(val) {
   return encodeURIComponent(val).
@@ -1763,7 +2282,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 
 /***/ }),
 
-/***/ 7189:
+/***/ 5787:
 /***/ ((module) => {
 
 "use strict";
@@ -1785,13 +2304,13 @@ module.exports = function combineURLs(baseURL, relativeURL) {
 
 /***/ }),
 
-/***/ 1545:
+/***/ 1186:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 module.exports = (
   utils.isStandardBrowserEnv() ?
@@ -1846,7 +2365,7 @@ module.exports = (
 
 /***/ }),
 
-/***/ 1301:
+/***/ 8819:
 /***/ ((module) => {
 
 "use strict";
@@ -1868,13 +2387,13 @@ module.exports = function isAbsoluteURL(url) {
 
 /***/ }),
 
-/***/ 3608:
+/***/ 9119:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 module.exports = (
   utils.isStandardBrowserEnv() ?
@@ -1944,13 +2463,13 @@ module.exports = (
 
 /***/ }),
 
-/***/ 6240:
+/***/ 1737:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 module.exports = function normalizeHeaderName(headers, normalizedName) {
   utils.forEach(headers, function processHeader(value, name) {
@@ -1964,13 +2483,13 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
 
 /***/ }),
 
-/***/ 6455:
+/***/ 318:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var utils = __webpack_require__(328);
+var utils = __webpack_require__(7450);
 
 // Headers whose duplicates are ignored by node
 // c.f. https://nodejs.org/api/http.html#http_message_headers
@@ -2025,7 +2544,7 @@ module.exports = function parseHeaders(headers) {
 
 /***/ }),
 
-/***/ 4850:
+/***/ 553:
 /***/ ((module) => {
 
 "use strict";
@@ -2060,13 +2579,13 @@ module.exports = function spread(callback) {
 
 /***/ }),
 
-/***/ 328:
+/***/ 7450:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-var bind = __webpack_require__(7065);
+var bind = __webpack_require__(1646);
 
 /*global toString:true*/
 
@@ -2419,7 +2938,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 9417:
+/***/ 1455:
 /***/ ((module) => {
 
 "use strict";
@@ -2486,11 +3005,11 @@ function range(a, b, str) {
 
 /***/ }),
 
-/***/ 3717:
+/***/ 2438:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-var concatMap = __webpack_require__(6891);
-var balanced = __webpack_require__(9417);
+var concatMap = __webpack_require__(4178);
+var balanced = __webpack_require__(1455);
 
 module.exports = expandTop;
 
@@ -2694,7 +3213,7 @@ function expand(str, isTop) {
 
 /***/ }),
 
-/***/ 9051:
+/***/ 7161:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -2869,7 +3388,7 @@ chownr.sync = chownrSync
 
 /***/ }),
 
-/***/ 6891:
+/***/ 4178:
 /***/ ((module) => {
 
 module.exports = function (xs, fn) {
@@ -2889,7 +3408,7 @@ var isArray = Array.isArray || function (xs) {
 
 /***/ }),
 
-/***/ 8222:
+/***/ 7543:
 /***/ ((module, exports, __webpack_require__) => {
 
 /* eslint-env browser */
@@ -3146,7 +3665,7 @@ function localstorage() {
 	}
 }
 
-module.exports = __webpack_require__(6243)(exports);
+module.exports = __webpack_require__(7404)(exports);
 
 const {formatters} = module.exports;
 
@@ -3165,7 +3684,7 @@ formatters.j = function (v) {
 
 /***/ }),
 
-/***/ 6243:
+/***/ 7404:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 
@@ -3181,7 +3700,7 @@ function setup(env) {
 	createDebug.disable = disable;
 	createDebug.enable = enable;
 	createDebug.enabled = enabled;
-	createDebug.humanize = __webpack_require__(900);
+	createDebug.humanize = __webpack_require__(3252);
 	createDebug.destroy = destroy;
 
 	Object.keys(env).forEach(key => {
@@ -3433,7 +3952,7 @@ module.exports = setup;
 
 /***/ }),
 
-/***/ 8237:
+/***/ 9789:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 /**
@@ -3442,15 +3961,15 @@ module.exports = setup;
  */
 
 if (typeof process === 'undefined' || process.type === 'renderer' || process.browser === true || process.__nwjs) {
-	module.exports = __webpack_require__(8222);
+	module.exports = __webpack_require__(7543);
 } else {
-	module.exports = __webpack_require__(5332);
+	module.exports = __webpack_require__(505);
 }
 
 
 /***/ }),
 
-/***/ 5332:
+/***/ 505:
 /***/ ((module, exports, __webpack_require__) => {
 
 /**
@@ -3484,7 +4003,7 @@ exports.colors = [6, 2, 3, 4, 5, 1];
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
 	// eslint-disable-next-line import/no-extraneous-dependencies
-	const supportsColor = __webpack_require__(9318);
+	const supportsColor = __webpack_require__(9064);
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
 		exports.colors = [
@@ -3692,7 +4211,7 @@ function init(debug) {
 	}
 }
 
-module.exports = __webpack_require__(6243)(exports);
+module.exports = __webpack_require__(7404)(exports);
 
 const {formatters} = module.exports;
 
@@ -3720,13 +4239,13 @@ formatters.O = function (v) {
 
 /***/ }),
 
-/***/ 1133:
+/***/ 685:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 var debug;
 try {
   /* eslint global-require: off */
-  debug = __webpack_require__(8237)("follow-redirects");
+  debug = __webpack_require__(9789)("follow-redirects");
 }
 catch (error) {
   debug = function () { /* */ };
@@ -3736,7 +4255,7 @@ module.exports = debug;
 
 /***/ }),
 
-/***/ 7707:
+/***/ 9371:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 var url = __webpack_require__(8835);
@@ -3745,7 +4264,7 @@ var http = __webpack_require__(8605);
 var https = __webpack_require__(7211);
 var Writable = __webpack_require__(2413).Writable;
 var assert = __webpack_require__(2357);
-var debug = __webpack_require__(1133);
+var debug = __webpack_require__(685);
 
 // Create handlers that pass events from native requests
 var eventHandlers = Object.create(null);
@@ -4241,12 +4760,12 @@ module.exports.wrap = wrap;
 
 /***/ }),
 
-/***/ 7714:
+/***/ 5438:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
-const MiniPass = __webpack_require__(1077)
+const MiniPass = __webpack_require__(1043)
 const EE = __webpack_require__(8614).EventEmitter
 const fs = __webpack_require__(5747)
 
@@ -4671,7 +5190,7 @@ exports.WriteStreamSync = WriteStreamSync
 
 /***/ }),
 
-/***/ 6863:
+/***/ 8513:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 module.exports = realpath
@@ -4687,7 +5206,7 @@ var origRealpathSync = fs.realpathSync
 
 var version = process.version
 var ok = /^v[0-5]\./.test(version)
-var old = __webpack_require__(1734)
+var old = __webpack_require__(8471)
 
 function newError (er) {
   return er && er.syscall === 'realpath' && (
@@ -4744,7 +5263,7 @@ function unmonkeypatch () {
 
 /***/ }),
 
-/***/ 1734:
+/***/ 8471:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 // Copyright Joyent, Inc. and other Node contributors.
@@ -5054,7 +5573,7 @@ exports.realpath = function realpath(p, cache, cb) {
 
 /***/ }),
 
-/***/ 7625:
+/***/ 8540:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 exports.alphasort = alphasort
@@ -5072,8 +5591,8 @@ function ownProp (obj, field) {
 }
 
 var path = __webpack_require__(5622)
-var minimatch = __webpack_require__(3973)
-var isAbsolute = __webpack_require__(8714)
+var minimatch = __webpack_require__(4255)
+var isAbsolute = __webpack_require__(7645)
 var Minimatch = minimatch.Minimatch
 
 function alphasorti (a, b) {
@@ -5301,7 +5820,7 @@ function childrenIgnored (self, path) {
 
 /***/ }),
 
-/***/ 1957:
+/***/ 6739:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Approach:
@@ -5347,26 +5866,26 @@ function childrenIgnored (self, path) {
 module.exports = glob
 
 var fs = __webpack_require__(5747)
-var rp = __webpack_require__(6863)
-var minimatch = __webpack_require__(3973)
+var rp = __webpack_require__(8513)
+var minimatch = __webpack_require__(4255)
 var Minimatch = minimatch.Minimatch
-var inherits = __webpack_require__(4124)
+var inherits = __webpack_require__(9083)
 var EE = __webpack_require__(8614).EventEmitter
 var path = __webpack_require__(5622)
 var assert = __webpack_require__(2357)
-var isAbsolute = __webpack_require__(8714)
-var globSync = __webpack_require__(9010)
-var common = __webpack_require__(7625)
+var isAbsolute = __webpack_require__(7645)
+var globSync = __webpack_require__(1897)
+var common = __webpack_require__(8540)
 var alphasort = common.alphasort
 var alphasorti = common.alphasorti
 var setopts = common.setopts
 var ownProp = common.ownProp
-var inflight = __webpack_require__(2492)
+var inflight = __webpack_require__(1334)
 var util = __webpack_require__(1669)
 var childrenIgnored = common.childrenIgnored
 var isIgnored = common.isIgnored
 
-var once = __webpack_require__(1223)
+var once = __webpack_require__(9482)
 
 function glob (pattern, options, cb) {
   if (typeof options === 'function') cb = options, options = {}
@@ -6098,22 +6617,22 @@ Glob.prototype._stat2 = function (f, abs, er, stat, cb) {
 
 /***/ }),
 
-/***/ 9010:
+/***/ 1897:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 module.exports = globSync
 globSync.GlobSync = GlobSync
 
 var fs = __webpack_require__(5747)
-var rp = __webpack_require__(6863)
-var minimatch = __webpack_require__(3973)
+var rp = __webpack_require__(8513)
+var minimatch = __webpack_require__(4255)
 var Minimatch = minimatch.Minimatch
-var Glob = __webpack_require__(1957).Glob
+var Glob = __webpack_require__(6739).Glob
 var util = __webpack_require__(1669)
 var path = __webpack_require__(5622)
 var assert = __webpack_require__(2357)
-var isAbsolute = __webpack_require__(8714)
-var common = __webpack_require__(7625)
+var isAbsolute = __webpack_require__(7645)
+var common = __webpack_require__(8540)
 var alphasort = common.alphasort
 var alphasorti = common.alphasorti
 var setopts = common.setopts
@@ -6591,7 +7110,7 @@ GlobSync.prototype._makeAbs = function (f) {
 
 /***/ }),
 
-/***/ 1621:
+/***/ 6258:
 /***/ ((module) => {
 
 "use strict";
@@ -6607,12 +7126,12 @@ module.exports = (flag, argv = process.argv) => {
 
 /***/ }),
 
-/***/ 2492:
+/***/ 1334:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-var wrappy = __webpack_require__(2940)
+var wrappy = __webpack_require__(3273)
 var reqs = Object.create(null)
-var once = __webpack_require__(1223)
+var once = __webpack_require__(9482)
 
 module.exports = wrappy(inflight)
 
@@ -6668,7 +7187,7 @@ function slice (args) {
 
 /***/ }),
 
-/***/ 4124:
+/***/ 9083:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 try {
@@ -6678,13 +7197,13 @@ try {
   module.exports = util.inherits;
 } catch (e) {
   /* istanbul ignore next */
-  module.exports = __webpack_require__(8544);
+  module.exports = __webpack_require__(1910);
 }
 
 
 /***/ }),
 
-/***/ 8544:
+/***/ 1910:
 /***/ ((module) => {
 
 if (typeof Object.create === 'function') {
@@ -6718,7 +7237,7 @@ if (typeof Object.create === 'function') {
 
 /***/ }),
 
-/***/ 3973:
+/***/ 4255:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 module.exports = minimatch
@@ -6730,7 +7249,7 @@ try {
 } catch (er) {}
 
 var GLOBSTAR = minimatch.GLOBSTAR = Minimatch.GLOBSTAR = {}
-var expand = __webpack_require__(3717)
+var expand = __webpack_require__(2438)
 
 var plTypes = {
   '!': { open: '(?:(?!(?:', close: '))[^/]*?)'},
@@ -7648,14 +8167,14 @@ function regExpEscape (s) {
 
 /***/ }),
 
-/***/ 1077:
+/***/ 1043:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 const EE = __webpack_require__(8614)
 const Stream = __webpack_require__(2413)
-const Yallist = __webpack_require__(665)
+const Yallist = __webpack_require__(9698)
 const SD = __webpack_require__(4304).StringDecoder
 
 const EOF = Symbol('EOF')
@@ -8201,7 +8720,7 @@ module.exports = class Minipass extends Stream {
 
 /***/ }),
 
-/***/ 6769:
+/***/ 9209:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Update with any zlib constants that are added or changed in the future.
@@ -8323,7 +8842,7 @@ module.exports = Object.freeze(Object.assign(Object.create(null), {
 
 /***/ }),
 
-/***/ 3486:
+/***/ 1758:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
@@ -8333,8 +8852,8 @@ const assert = __webpack_require__(2357)
 const Buffer = __webpack_require__(4293).Buffer
 const realZlib = __webpack_require__(8761)
 
-const constants = exports.constants = __webpack_require__(6769)
-const Minipass = __webpack_require__(1077)
+const constants = exports.constants = __webpack_require__(9209)
+const Minipass = __webpack_require__(1043)
 
 const OriginalBufferConcat = Buffer.concat
 
@@ -8679,15 +9198,15 @@ if (typeof realZlib.BrotliCompress === 'function') {
 
 /***/ }),
 
-/***/ 6186:
+/***/ 6164:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-const optsArg = __webpack_require__(2853)
-const pathArg = __webpack_require__(2930)
+const optsArg = __webpack_require__(2837)
+const pathArg = __webpack_require__(1223)
 
-const {mkdirpNative, mkdirpNativeSync} = __webpack_require__(4983)
-const {mkdirpManual, mkdirpManualSync} = __webpack_require__(356)
-const {useNative, useNativeSync} = __webpack_require__(4518)
+const {mkdirpNative, mkdirpNativeSync} = __webpack_require__(2253)
+const {mkdirpManual, mkdirpManualSync} = __webpack_require__(3160)
+const {useNative, useNativeSync} = __webpack_require__(9203)
 
 
 const mkdirp = (path, opts) => {
@@ -8717,7 +9236,7 @@ module.exports = mkdirp
 
 /***/ }),
 
-/***/ 4992:
+/***/ 5613:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const {dirname} = __webpack_require__(5622)
@@ -8753,7 +9272,7 @@ module.exports = {findMade, findMadeSync}
 
 /***/ }),
 
-/***/ 356:
+/***/ 3160:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const {dirname} = __webpack_require__(5622)
@@ -8824,12 +9343,12 @@ module.exports = {mkdirpManual, mkdirpManualSync}
 
 /***/ }),
 
-/***/ 4983:
+/***/ 2253:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const {dirname} = __webpack_require__(5622)
-const {findMade, findMadeSync} = __webpack_require__(4992)
-const {mkdirpManual, mkdirpManualSync} = __webpack_require__(356)
+const {findMade, findMadeSync} = __webpack_require__(5613)
+const {mkdirpManual, mkdirpManualSync} = __webpack_require__(3160)
 
 const mkdirpNative = (path, opts) => {
   opts.recursive = true
@@ -8870,7 +9389,7 @@ module.exports = {mkdirpNative, mkdirpNativeSync}
 
 /***/ }),
 
-/***/ 2853:
+/***/ 2837:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const { promisify } = __webpack_require__(1669)
@@ -8900,7 +9419,7 @@ module.exports = optsArg
 
 /***/ }),
 
-/***/ 2930:
+/***/ 1223:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const platform = process.env.__TESTING_MKDIRP_PLATFORM__ || process.platform
@@ -8936,7 +9455,7 @@ module.exports = pathArg
 
 /***/ }),
 
-/***/ 4518:
+/***/ 9203:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const fs = __webpack_require__(5747)
@@ -8953,7 +9472,7 @@ module.exports = {useNative, useNativeSync}
 
 /***/ }),
 
-/***/ 900:
+/***/ 3252:
 /***/ ((module) => {
 
 /**
@@ -9122,10 +9641,10 @@ function plural(ms, msAbs, n, name) {
 
 /***/ }),
 
-/***/ 1223:
+/***/ 9482:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-var wrappy = __webpack_require__(2940)
+var wrappy = __webpack_require__(3273)
 module.exports = wrappy(once)
 module.exports.strict = wrappy(onceStrict)
 
@@ -9171,7 +9690,7 @@ function onceStrict (fn) {
 
 /***/ }),
 
-/***/ 8714:
+/***/ 7645:
 /***/ ((module) => {
 
 "use strict";
@@ -9199,7 +9718,7 @@ module.exports.win32 = win32;
 
 /***/ }),
 
-/***/ 4959:
+/***/ 7636:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 const assert = __webpack_require__(2357)
@@ -9207,7 +9726,7 @@ const path = __webpack_require__(5622)
 const fs = __webpack_require__(5747)
 let glob = undefined
 try {
-  glob = __webpack_require__(1957)
+  glob = __webpack_require__(6739)
 } catch (_err) {
   // treat glob as optional.
 }
@@ -9566,500 +10085,14 @@ rimraf.sync = rimrafSync
 
 /***/ }),
 
-/***/ 3603:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.APIClient = void 0;
-const axios_1 = __importDefault(__webpack_require__(6545));
-const fs_1 = __importDefault(__webpack_require__(5747));
-const conversions_1 = __webpack_require__(3770);
-class APIClient {
-    constructor(cfg) {
-        this.cfg = cfg;
-        this.client = axios_1.default.create({
-            baseURL: this.cfg.baseURL,
-            headers: {
-                Authorization: `Key ${this.cfg.apiKey}`
-            }
-        });
-    }
-    async createApp(appName) {
-        return this.client.post('applications', { name: appName })
-            .then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async getApp(appID) {
-        return this.client.get(`applications/${appID}`)
-            .then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async updateApp(appID, updates) {
-        return this.client.post(`applications/${appID}`, updates)
-            .then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async updateAppVanityURL(appID, vanityURL) {
-        return this.client.post(`applications/${appID}/vanities`, { 'app_id': appID, 'path_prefix': vanityURL }).then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async uploadApp(appID, bundle) {
-        return this.client.post(`applications/${appID}/upload`, fs_1.default.createReadStream(bundle.tarballPath)).then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async deployApp(appID, bundleID) {
-        return this.client.post(`applications/${appID}/deploy`, { bundle: bundleID }).then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async listApplications(params) {
-        return this.client.get('applications', { params })
-            .then((resp) => {
-            const data = resp.data;
-            const { applications, count, total, continuation } = data;
-            return {
-                applications: applications.map(conversions_1.snake2camel),
-                count,
-                total,
-                continuation
-            };
-        });
-    }
-    async getTask(taskId, status) {
-        return this.client.get(`tasks/${taskId}`, status
-            ? { params: { 'first_status': status } }
-            : undefined).then((resp) => conversions_1.snake2camel(resp.data));
-    }
-    async serverSettings(sub) {
-        let path = 'server_settings';
-        if (sub !== undefined) {
-            if (['python', 'r'].includes(sub)) {
-                path = `v1/server_settings/${sub}`;
-            }
-            else {
-                path = `server_settings/${sub}`;
-            }
-        }
-        return this.client.get(path);
-    }
-}
-exports.APIClient = APIClient;
-
-
-/***/ }),
-
-/***/ 9984:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Bundle = void 0;
-const tmp_1 = __importDefault(__webpack_require__(8517));
-if (process.env.DEBUG !== "enabled") {
-    tmp_1.default.setGracefulCleanup();
-}
-class Bundle {
-    constructor(manifestPath, manifest) {
-        this.manifestPath = manifestPath;
-        this.manifest = manifest;
-        this.f = tmp_1.default.fileSync({
-            prefix: "rsconnect-ts",
-            postfix: "bundle.tar.gz"
-        });
-    }
-    get tarballPath() {
-        return this.f.name;
-    }
-}
-exports.Bundle = Bundle;
-
-
-/***/ }),
-
-/***/ 465:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Bundler = void 0;
-const path_1 = __importDefault(__webpack_require__(5622));
-const tar_1 = __importDefault(__webpack_require__(4674));
-const Bundle_1 = __webpack_require__(9984);
-const Manifest_1 = __webpack_require__(6678);
-class Bundler {
-    constructor() { }
-    async fromManifest(manifestPath) {
-        const manifest = new Manifest_1.Manifest(manifestPath);
-        const bundle = new Bundle_1.Bundle(manifestPath, manifest);
-        const fileList = [
-            path_1.default.basename(manifestPath),
-        ].concat(Array.from(manifest.files.keys()));
-        await tar_1.default.create({ gzip: true, file: bundle.tarballPath, cwd: path_1.default.dirname(manifestPath) }, fileList);
-        return bundle;
-    }
-}
-exports.Bundler = Bundler;
-
-
-/***/ }),
-
-/***/ 8699:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ClientTaskPoller = void 0;
-class ClientTaskPoller {
-    constructor(client, taskId, sleepInterval) {
-        this.client = client;
-        this.taskId = taskId;
-        this.sleepInterval = sleepInterval || 500;
-    }
-    async *poll(timeout) {
-        var _a, _b;
-        let pollTimeout = timeout ? ((Date.now() / 1000 | 0) + timeout) : Infinity;
-        let lastStatus = undefined;
-        while ((Date.now() / 1000 | 0) < pollTimeout) {
-            await this.sleepTick();
-            const curTask = await this.client.getTask(this.taskId, lastStatus);
-            yield {
-                status: curTask.status,
-                type: (_a = curTask.result) === null || _a === void 0 ? void 0 : _a.type,
-                data: (_b = curTask.result) === null || _b === void 0 ? void 0 : _b.data,
-            };
-            lastStatus = curTask.lastStatus;
-            if (curTask.finished) {
-                return;
-            }
-        }
-    }
-    async sleepTick() {
-        return new Promise((resolve) => {
-            setTimeout(resolve, this.sleepInterval);
-        });
-    }
-}
-exports.ClientTaskPoller = ClientTaskPoller;
-
-
-/***/ }),
-
-/***/ 7852:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Deployer = void 0;
-const path_1 = __importDefault(__webpack_require__(5622));
-const crypto_1 = __importDefault(__webpack_require__(6417));
-const url_1 = __webpack_require__(8835);
-const Bundler_1 = __webpack_require__(465);
-const ListApplicationsPager_1 = __webpack_require__(7580);
-const MiniGit_1 = __webpack_require__(8206);
-class Deployer {
-    constructor(client) {
-        this.client = client;
-        this.bundler = new Bundler_1.Bundler();
-        this.git = new MiniGit_1.MiniGit();
-    }
-    async deployManifest(manifestPath, appPath) {
-        return this.deployBundle(await this.bundler.fromManifest(manifestPath), appPath);
-    }
-    async deployBundle(bundle, appPath) {
-        var _a;
-        let resolvedAppPath = this.resolveAppPath(bundle.manifestPath, appPath);
-        let appID = null;
-        let app = null;
-        let reassignTitle = false;
-        if (resolvedAppPath !== "") {
-            // TODO: use an API that doesn't require scanning all applications, if possible
-            const existingApp = await this.findExistingApp(resolvedAppPath);
-            if (existingApp !== null) {
-                appID = existingApp.id;
-            }
-        }
-        const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
-        if (appID === null) {
-            const appName = this.makeDeploymentName(manifestTitle || resolvedAppPath);
-            app = await this.client.createApp(appName);
-            appID = app.id;
-            reassignTitle = true;
-        }
-        else {
-            app = await this.client.getApp(appID);
-        }
-        if (app == null) {
-            return Promise.reject("unable to find or create app");
-        }
-        if (!app.vanityUrl && resolvedAppPath !== "") {
-            await this.client.updateAppVanityURL(appID, resolvedAppPath);
-        }
-        if (manifestTitle !== undefined && manifestTitle !== null && reassignTitle) {
-            app.title = manifestTitle;
-            await this.client.updateApp(appID, { title: app.title });
-        }
-        const uploadedBundle = await this.client.uploadApp(appID, bundle);
-        return this.client.deployApp(appID, uploadedBundle.id)
-            .then((ct) => {
-            const taskApp = app;
-            return {
-                taskId: ct.id,
-                appId: taskApp.id,
-                appGuid: taskApp.guid,
-                appUrl: taskApp.url,
-                title: taskApp.title || ''
-            };
-        });
-    }
-    async findExistingApp(appPath) {
-        let found = null;
-        const pager = new ListApplicationsPager_1.ListApplicationsPager(this.client);
-        for await (const app of pager.listApplications()) {
-            const currentAppPath = new url_1.URL(app.url).pathname;
-            if (currentAppPath === appPath) {
-                found = app;
-                break;
-            }
-        }
-        return found;
-    }
-    resolveAppPath(manifestPath, appPath) {
-        if (appPath) {
-            return this.strictAppPath(appPath);
-        }
-        if (!manifestPath) {
-            return "";
-        }
-        const gitTopLevel = this.git.showTopLevel();
-        if (gitTopLevel === null) {
-            return this.strictAppPath(path_1.default.basename(path_1.default.dirname(manifestPath)));
-        }
-        const relPath = path_1.default.dirname(manifestPath).replace(gitTopLevel, "");
-        return this.strictAppPath(relPath);
-    }
-    strictAppPath(appPath) {
-        return ('/' +
-            appPath.trim().replace(/${path.sep}/g, "/") +
-            '/').replace(/\/\//g, '/').replace(/_+/, '_');
-    }
-    makeDeploymentName(title) {
-        if (!title) {
-            title = 'unnamed ' + crypto_1.default.randomBytes(15).toString('base64');
-        }
-        let name = title.toLowerCase().replace(/ /g, "_");
-        name = name.replace(/[^A-Za-z0-9_ -]+/g, "");
-        name = name.replace(/_+/g, "_");
-        name = name.substring(0, 64);
-        if (name.length < 3) {
-            for (let i = name.length; i < 3; i++) {
-                name += '_';
-            }
-        }
-        return name;
-    }
-}
-exports.Deployer = Deployer;
-
-
-/***/ }),
-
-/***/ 7580:
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ListApplicationsPager = void 0;
-const conversions_1 = __webpack_require__(3770);
-class ListApplicationsPager {
-    constructor(client) {
-        this.client = client;
-    }
-    async *listApplications(maxRecords) {
-        let resetMaxRecords = false;
-        if (maxRecords === undefined || maxRecords === null || maxRecords <= 0) {
-            maxRecords = Infinity;
-            resetMaxRecords = true;
-        }
-        let n = 0;
-        let pageParams = {
-            start: 0,
-            count: maxRecords < 100 ? maxRecords : 100,
-            cont: ""
-        };
-        while (pageParams.start < maxRecords) {
-            const page = await this.client.listApplications(pageParams);
-            if (n === 0) {
-                if (resetMaxRecords || maxRecords > page.total) {
-                    maxRecords = page.total;
-                }
-            }
-            for (let i = 0; i < page.applications.length; i++) {
-                if (n >= maxRecords) {
-                    return n;
-                }
-                n++;
-                yield conversions_1.snake2camel(page.applications[i]);
-            }
-            pageParams.cont = page.continuation;
-            pageParams.start += pageParams.count;
-        }
-        return n;
-    }
-}
-exports.ListApplicationsPager = ListApplicationsPager;
-
-
-/***/ }),
-
-/***/ 6678:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.Manifest = void 0;
-const fs_1 = __importDefault(__webpack_require__(5747));
-const path_1 = __importDefault(__webpack_require__(5622));
-class Manifest {
-    constructor(source) {
-        this.source = source;
-        this.rawData = new Map();
-        const rawObject = JSON.parse(fs_1.default.readFileSync(this.source).toString('utf-8'));
-        for (let key in rawObject) {
-            this.rawData.set(key, rawObject[key]);
-        }
-    }
-    get files() {
-        const fileMap = new Map();
-        if (!this.rawData.has('files')) {
-            return fileMap;
-        }
-        const rawFiles = this.rawData.get('files');
-        Object.keys(rawFiles).forEach((key) => {
-            if (key === "packrat/packrat.lock" || key.match(/^packrat\/desc\//)) {
-                return;
-            }
-            fileMap.set(key, rawFiles[key]);
-        });
-        return fileMap;
-    }
-    get title() {
-        let filename = null;
-        if (this.rawData.has('metadata')) {
-            const metadata = this.rawData.get('metadata');
-            filename = (metadata['entrypoint'] ||
-                metadata['primary_rmd'] ||
-                metadata['primary_html']);
-            if (filename && filename.match(/^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/)) {
-                filename = null;
-            }
-        }
-        if (filename == null) {
-            return null;
-        }
-        return this.defaultTitle(filename);
-    }
-    defaultTitle(fileName) {
-        return path_1.default.basename(path_1.default.resolve(process.cwd(), fileName));
-    }
-}
-exports.Manifest = Manifest;
-
-
-/***/ }),
-
-/***/ 8206:
-/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
-
-"use strict";
-
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.MiniGit = void 0;
-const child_process_1 = __importDefault(__webpack_require__(3129));
-class MiniGit {
-    showTopLevel() {
-        try {
-            const wt = child_process_1.default.execSync("git rev-parse --show-toplevel");
-            return wt.toString('utf-8').trim();
-        }
-        catch (_err) {
-            return null;
-        }
-    }
-}
-exports.MiniGit = MiniGit;
-
-
-/***/ }),
-
-/***/ 3770:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.snake2camel = void 0;
-function snake2camel(obj) {
-    if (typeof (obj) === "string") {
-        return obj.replace(/(_.)/, (match) => match.replace("_", "").toUpperCase());
-    }
-    let out = {};
-    Object.keys(obj).forEach((k) => {
-        const camelKey = snake2camel(k);
-        out[camelKey] = obj[k];
-    });
-    return out;
-}
-exports.snake2camel = snake2camel;
-
-
-/***/ }),
-
-/***/ 6329:
-/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ListApplicationsPager = exports.Deployer = exports.ClientTaskPoller = exports.APIClient = void 0;
-var APIClient_1 = __webpack_require__(3603);
-Object.defineProperty(exports, "APIClient", ({ enumerable: true, get: function () { return APIClient_1.APIClient; } }));
-var ClientTaskPoller_1 = __webpack_require__(8699);
-Object.defineProperty(exports, "ClientTaskPoller", ({ enumerable: true, get: function () { return ClientTaskPoller_1.ClientTaskPoller; } }));
-var Deployer_1 = __webpack_require__(7852);
-Object.defineProperty(exports, "Deployer", ({ enumerable: true, get: function () { return Deployer_1.Deployer; } }));
-var ListApplicationsPager_1 = __webpack_require__(7580);
-Object.defineProperty(exports, "ListApplicationsPager", ({ enumerable: true, get: function () { return ListApplicationsPager_1.ListApplicationsPager; } }));
-
-
-/***/ }),
-
-/***/ 9318:
+/***/ 9064:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 const os = __webpack_require__(2087);
 const tty = __webpack_require__(3867);
-const hasFlag = __webpack_require__(1621);
+const hasFlag = __webpack_require__(6258);
 
 const {env} = process;
 
@@ -10195,45 +10228,45 @@ module.exports = {
 
 /***/ }),
 
-/***/ 4674:
+/***/ 132:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 
 // high-level commands
-exports.c = exports.create = __webpack_require__(4016)
-exports.r = exports.replace = __webpack_require__(5923)
-exports.t = exports.list = __webpack_require__(1525)
-exports.u = exports.update = __webpack_require__(4404)
-exports.x = exports.extract = __webpack_require__(5317)
+exports.c = exports.create = __webpack_require__(7666)
+exports.r = exports.replace = __webpack_require__(7527)
+exports.t = exports.list = __webpack_require__(9164)
+exports.u = exports.update = __webpack_require__(3978)
+exports.x = exports.extract = __webpack_require__(9616)
 
 // classes
-exports.Pack = __webpack_require__(7900)
-exports.Unpack = __webpack_require__(7628)
-exports.Parse = __webpack_require__(8917)
-exports.ReadEntry = __webpack_require__(8116)
-exports.WriteEntry = __webpack_require__(5450)
-exports.Header = __webpack_require__(6043)
-exports.Pax = __webpack_require__(7996)
-exports.types = __webpack_require__(4173)
+exports.Pack = __webpack_require__(4834)
+exports.Unpack = __webpack_require__(194)
+exports.Parse = __webpack_require__(7471)
+exports.ReadEntry = __webpack_require__(9046)
+exports.WriteEntry = __webpack_require__(5440)
+exports.Header = __webpack_require__(8205)
+exports.Pax = __webpack_require__(6207)
+exports.types = __webpack_require__(5933)
 
 
 /***/ }),
 
-/***/ 4016:
+/***/ 7666:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
 // tar -c
-const hlo = __webpack_require__(5274)
+const hlo = __webpack_require__(2796)
 
-const Pack = __webpack_require__(7900)
+const Pack = __webpack_require__(4834)
 const fs = __webpack_require__(5747)
-const fsm = __webpack_require__(7714)
-const t = __webpack_require__(1525)
+const fsm = __webpack_require__(5438)
+const t = __webpack_require__(9164)
 const path = __webpack_require__(5622)
 
 const c = module.exports = (opt_, files, cb) => {
@@ -10334,17 +10367,17 @@ const create = (opt, files) => {
 
 /***/ }),
 
-/***/ 5317:
+/***/ 9616:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
 // tar -x
-const hlo = __webpack_require__(5274)
-const Unpack = __webpack_require__(7628)
+const hlo = __webpack_require__(2796)
+const Unpack = __webpack_require__(194)
 const fs = __webpack_require__(5747)
-const fsm = __webpack_require__(7714)
+const fsm = __webpack_require__(5438)
 const path = __webpack_require__(5622)
 
 const x = module.exports = (opt_, files, cb) => {
@@ -10454,7 +10487,7 @@ const extract = opt => {
 
 /***/ }),
 
-/***/ 1172:
+/***/ 9460:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // Get the appropriate flag to use for creating files
@@ -10481,7 +10514,7 @@ module.exports = !fMapEnabled ? () => 'w'
 
 /***/ }),
 
-/***/ 6043:
+/***/ 8205:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -10491,9 +10524,9 @@ module.exports = !fMapEnabled ? () => 'w'
 // the data could not be faithfully encoded in a simple header.
 // (Also, check header.needPax to see if it needs a pax header.)
 
-const types = __webpack_require__(4173)
+const types = __webpack_require__(5933)
 const pathModule = __webpack_require__(5622).posix
-const large = __webpack_require__(2370)
+const large = __webpack_require__(8157)
 
 const SLURP = Symbol('slurp')
 const TYPE = Symbol('type')
@@ -10777,7 +10810,7 @@ module.exports = Header
 
 /***/ }),
 
-/***/ 5274:
+/***/ 2796:
 /***/ ((module) => {
 
 "use strict";
@@ -10814,7 +10847,7 @@ const parse = module.exports = opt => opt ? Object.keys(opt).map(k => [
 
 /***/ }),
 
-/***/ 2370:
+/***/ 8157:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -10919,7 +10952,7 @@ const twosComp = byte => ((0xff ^ byte) + 1) & 0xff
 
 /***/ }),
 
-/***/ 1525:
+/***/ 9164:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -10929,10 +10962,10 @@ const twosComp = byte => ((0xff ^ byte) + 1) & 0xff
 // maybe some DRY opportunity here?
 
 // tar -t
-const hlo = __webpack_require__(5274)
-const Parser = __webpack_require__(8917)
+const hlo = __webpack_require__(2796)
+const Parser = __webpack_require__(7471)
 const fs = __webpack_require__(5747)
-const fsm = __webpack_require__(7714)
+const fsm = __webpack_require__(5438)
 const path = __webpack_require__(5622)
 
 const t = module.exports = (opt_, files, cb) => {
@@ -11055,7 +11088,7 @@ const list = opt => new Parser(opt)
 
 /***/ }),
 
-/***/ 9624:
+/***/ 6813:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -11065,10 +11098,10 @@ const list = opt => new Parser(opt)
 // TODO: This should probably be a class, not functionally
 // passing around state in a gazillion args.
 
-const mkdirp = __webpack_require__(6186)
+const mkdirp = __webpack_require__(6164)
 const fs = __webpack_require__(5747)
 const path = __webpack_require__(5622)
-const chownr = __webpack_require__(9051)
+const chownr = __webpack_require__(7161)
 
 class SymlinkError extends Error {
   constructor (symlink, path) {
@@ -11269,7 +11302,7 @@ const mkdirSync = module.exports.sync = (dir, opt) => {
 
 /***/ }),
 
-/***/ 8371:
+/***/ 9771:
 /***/ ((module) => {
 
 "use strict";
@@ -11301,7 +11334,7 @@ module.exports = (mode, isDir, portable) => {
 
 /***/ }),
 
-/***/ 7900:
+/***/ 4834:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -11329,13 +11362,13 @@ class PackJob {
   }
 }
 
-const MiniPass = __webpack_require__(1077)
-const zlib = __webpack_require__(3486)
-const ReadEntry = __webpack_require__(8116)
-const WriteEntry = __webpack_require__(5450)
+const MiniPass = __webpack_require__(1043)
+const zlib = __webpack_require__(1758)
+const ReadEntry = __webpack_require__(9046)
+const WriteEntry = __webpack_require__(5440)
 const WriteEntrySync = WriteEntry.Sync
 const WriteEntryTar = WriteEntry.Tar
-const Yallist = __webpack_require__(665)
+const Yallist = __webpack_require__(9698)
 const EOF = Buffer.alloc(1024)
 const ONSTAT = Symbol('onStat')
 const ENDED = Symbol('ended')
@@ -11360,7 +11393,7 @@ const ONDRAIN = Symbol('ondrain')
 
 const fs = __webpack_require__(5747)
 const path = __webpack_require__(5622)
-const warner = __webpack_require__(5899)
+const warner = __webpack_require__(1321)
 
 const Pack = warner(class Pack extends MiniPass {
   constructor (opt) {
@@ -11712,7 +11745,7 @@ module.exports = Pack
 
 /***/ }),
 
-/***/ 8917:
+/***/ 7471:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -11738,15 +11771,15 @@ module.exports = Pack
 //
 // ignored entries get .resume() called on them straight away
 
-const warner = __webpack_require__(5899)
+const warner = __webpack_require__(1321)
 const path = __webpack_require__(5622)
-const Header = __webpack_require__(6043)
+const Header = __webpack_require__(8205)
 const EE = __webpack_require__(8614)
-const Yallist = __webpack_require__(665)
+const Yallist = __webpack_require__(9698)
 const maxMetaEntrySize = 1024 * 1024
-const Entry = __webpack_require__(8116)
-const Pax = __webpack_require__(7996)
-const zlib = __webpack_require__(3486)
+const Entry = __webpack_require__(9046)
+const Pax = __webpack_require__(6207)
+const zlib = __webpack_require__(1758)
 
 const gzipHeader = Buffer.from([0x1f, 0x8b])
 const STATE = Symbol('state')
@@ -12203,7 +12236,7 @@ module.exports = warner(class Parser extends EE {
 
 /***/ }),
 
-/***/ 9587:
+/***/ 6879:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 // A path exclusive reservation system
@@ -12335,12 +12368,12 @@ module.exports = () => {
 
 /***/ }),
 
-/***/ 7996:
+/***/ 6207:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const Header = __webpack_require__(6043)
+const Header = __webpack_require__(8205)
 const path = __webpack_require__(5622)
 
 class Pax {
@@ -12488,13 +12521,13 @@ module.exports = Pax
 
 /***/ }),
 
-/***/ 8116:
+/***/ 9046:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const types = __webpack_require__(4173)
-const MiniPass = __webpack_require__(1077)
+const types = __webpack_require__(5933)
+const MiniPass = __webpack_require__(1043)
 
 const SLURP = Symbol('slurp')
 module.exports = class ReadEntry extends MiniPass {
@@ -12594,19 +12627,19 @@ module.exports = class ReadEntry extends MiniPass {
 
 /***/ }),
 
-/***/ 5923:
+/***/ 7527:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
 // tar -r
-const hlo = __webpack_require__(5274)
-const Pack = __webpack_require__(7900)
-const Parse = __webpack_require__(8917)
+const hlo = __webpack_require__(2796)
+const Pack = __webpack_require__(4834)
+const Parse = __webpack_require__(7471)
 const fs = __webpack_require__(5747)
-const fsm = __webpack_require__(7714)
-const t = __webpack_require__(1525)
+const fsm = __webpack_require__(5438)
+const t = __webpack_require__(9164)
 const path = __webpack_require__(5622)
 
 // starting at the head of the file, read a Header
@@ -12615,7 +12648,7 @@ const path = __webpack_require__(5622)
 // and try again.
 // Write the new Pack stream starting there.
 
-const Header = __webpack_require__(6043)
+const Header = __webpack_require__(8205)
 
 const r = module.exports = (opt_, files, cb) => {
   const opt = hlo(opt_)
@@ -12821,7 +12854,7 @@ const addFilesAsync = (p, files) => {
 
 /***/ }),
 
-/***/ 4173:
+/***/ 5933:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -12873,7 +12906,7 @@ exports.code = new Map(Array.from(exports.name).map(kv => [kv[1], kv[0]]))
 
 /***/ }),
 
-/***/ 7628:
+/***/ 194:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -12887,14 +12920,14 @@ exports.code = new Map(Array.from(exports.name).map(kv => [kv[1], kv[0]]))
 
 const assert = __webpack_require__(2357)
 const EE = __webpack_require__(8614).EventEmitter
-const Parser = __webpack_require__(8917)
+const Parser = __webpack_require__(7471)
 const fs = __webpack_require__(5747)
-const fsm = __webpack_require__(7714)
+const fsm = __webpack_require__(5438)
 const path = __webpack_require__(5622)
-const mkdir = __webpack_require__(9624)
+const mkdir = __webpack_require__(6813)
 const mkdirSync = mkdir.sync
-const wc = __webpack_require__(4808)
-const pathReservations = __webpack_require__(9587)
+const wc = __webpack_require__(225)
+const pathReservations = __webpack_require__(6879)
 
 const ONENTRY = Symbol('onEntry')
 const CHECKFS = Symbol('checkFs')
@@ -12921,7 +12954,7 @@ const DOCHOWN = Symbol('doChown')
 const UID = Symbol('uid')
 const GID = Symbol('gid')
 const crypto = __webpack_require__(6417)
-const getFlag = __webpack_require__(1172)
+const getFlag = __webpack_require__(9460)
 
 /* istanbul ignore next */
 const neverCalled = () => {
@@ -13561,7 +13594,7 @@ module.exports = Unpack
 
 /***/ }),
 
-/***/ 4404:
+/***/ 3978:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -13569,8 +13602,8 @@ module.exports = Unpack
 
 // tar -u
 
-const hlo = __webpack_require__(5274)
-const r = __webpack_require__(5923)
+const hlo = __webpack_require__(2796)
+const r = __webpack_require__(7527)
 // just call tar.r with the filter and mtimeCache
 
 const u = module.exports = (opt_, files, cb) => {
@@ -13605,7 +13638,7 @@ const mtimeFilter = opt => {
 
 /***/ }),
 
-/***/ 5899:
+/***/ 1321:
 /***/ ((module) => {
 
 "use strict";
@@ -13634,7 +13667,7 @@ module.exports = Base => class extends Base {
 
 /***/ }),
 
-/***/ 4808:
+/***/ 225:
 /***/ ((module) => {
 
 "use strict";
@@ -13665,19 +13698,19 @@ module.exports = {
 
 /***/ }),
 
-/***/ 5450:
+/***/ 5440:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const MiniPass = __webpack_require__(1077)
-const Pax = __webpack_require__(7996)
-const Header = __webpack_require__(6043)
-const ReadEntry = __webpack_require__(8116)
+const MiniPass = __webpack_require__(1043)
+const Pax = __webpack_require__(6207)
+const Header = __webpack_require__(8205)
+const ReadEntry = __webpack_require__(9046)
 const fs = __webpack_require__(5747)
 const path = __webpack_require__(5622)
 
-const types = __webpack_require__(4173)
+const types = __webpack_require__(5933)
 const maxReadSize = 16 * 1024 * 1024
 const PROCESS = Symbol('process')
 const FILE = Symbol('file')
@@ -13694,10 +13727,10 @@ const OPENFILE = Symbol('openfile')
 const ONOPENFILE = Symbol('onopenfile')
 const CLOSE = Symbol('close')
 const MODE = Symbol('mode')
-const warner = __webpack_require__(5899)
-const winchars = __webpack_require__(4808)
+const warner = __webpack_require__(1321)
+const winchars = __webpack_require__(225)
 
-const modeFix = __webpack_require__(8371)
+const modeFix = __webpack_require__(9771)
 
 const WriteEntry = warner(class WriteEntry extends MiniPass {
   constructor (p, opt) {
@@ -14109,7 +14142,7 @@ module.exports = WriteEntry
 
 /***/ }),
 
-/***/ 8517:
+/***/ 6155:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 /*!
@@ -14128,7 +14161,7 @@ const os = __webpack_require__(2087);
 const path = __webpack_require__(5622);
 const crypto = __webpack_require__(6417);
 const _c = { fs: fs.constants, os: os.constants };
-const rimraf = __webpack_require__(4959);
+const rimraf = __webpack_require__(7636);
 
 /*
  * The working inner variables.
@@ -14896,7 +14929,7 @@ module.exports.setGracefulCleanup = setGracefulCleanup;
 
 /***/ }),
 
-/***/ 2940:
+/***/ 3273:
 /***/ ((module) => {
 
 // Returns a wrapper function that returns a wrapped callback
@@ -14936,7 +14969,7 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 4091:
+/***/ 1987:
 /***/ ((module) => {
 
 "use strict";
@@ -14952,7 +14985,7 @@ module.exports = function (Yallist) {
 
 /***/ }),
 
-/***/ 665:
+/***/ 9698:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -15380,7 +15413,7 @@ function Node (value, prev, next, list) {
 
 try {
   // add if support for Symbol.iterator is present
-  __webpack_require__(4091)(Yallist)
+  __webpack_require__(1987)(Yallist)
 } catch (er) {}
 
 
@@ -15418,7 +15451,7 @@ exports.loadArgs = exports.connectPublish = void 0;
 const path_1 = __importDefault(__webpack_require__(5622));
 const url_1 = __webpack_require__(8835);
 const core = __importStar(__webpack_require__(2186));
-const rsconnect = __importStar(__webpack_require__(6329));
+const rsconnect = __importStar(__webpack_require__(5943));
 class ActionArgs {
     constructor() {
         this.apiKey = '';
@@ -15428,7 +15461,9 @@ class ActionArgs {
     }
 }
 async function connectPublish(args) {
-    const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL: args.url });
+    const baseURL = `${args.url.replace(/\/+$/, '')}/__api__`;
+    core.debug(`using base URL ${baseURL}`);
+    const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL });
     await client.serverSettings();
     return await publishFromDirs(client, args.dirs)
         .then((results) => {
@@ -15439,20 +15474,24 @@ async function connectPublish(args) {
         }
     })
         .catch((err) => {
+        if (core.isDebug()) {
+            console.trace(err);
+        }
         core.setFailed(err);
     });
 }
 exports.connectPublish = connectPublish;
 async function publishFromDirs(client, dirs) {
     const ret = [];
+    const deployer = new rsconnect.Deployer(client);
     for (const dir of dirs) {
-        ret.push(await publishFromDir(client, dir));
+        ret.push(await publishFromDir(client, deployer, dir));
     }
     return ret;
 }
-async function publishFromDir(client, dir) {
-    const deployer = new rsconnect.Deployer(client);
-    return deployer.deployManifest(path_1.default.join(dir, 'manifest.json'), dir)
+async function publishFromDir(client, deployer, dir) {
+    core.debug(`publishing dir ${dir}`);
+    return await deployer.deployManifest(path_1.default.join(dir, 'manifest.json'), dir)
         .then((resp) => {
         return new rsconnect.ClientTaskPoller(client, resp.taskId);
     })
@@ -15468,6 +15507,9 @@ async function publishFromDir(client, dir) {
         };
     })
         .catch((err) => {
+        if (core.isDebug()) {
+            console.trace(err);
+        }
         core.error(err);
         return {
             dir,
@@ -15554,7 +15596,7 @@ run();
 
 /***/ }),
 
-/***/ 696:
+/***/ 9843:
 /***/ ((module) => {
 
 "use strict";
