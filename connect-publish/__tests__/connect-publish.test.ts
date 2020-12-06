@@ -14,7 +14,7 @@ jest.setTimeout(1000 * 60 * 2)
 
 describe("connectPublish", () => {
   beforeEach(() => {
-    process.env['INPUT_URL'] = 'http://f1wc3w4090uv67yhud7j08zjzgvt7yfg@127.0.0.1:23939'
+    process.env['INPUT_URL'] = `http://${process.env.RSTUDIO_CONNECT_API_KEY}@127.0.0.1:23939`
     process.chdir(HERE)
   })
 

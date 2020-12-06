@@ -66,10 +66,12 @@ jobs:
       - run: yarn lint
       - run: yarn build
       - run: docker-compose up -d
-      - run: ./__tests__/wait-for-connect
+      - run: yarn test
         env:
           RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
       - run: yarn test
+        env:
+          RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
       - uses: ./connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
