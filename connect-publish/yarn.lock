@@ -1062,10 +1062,10 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@meatballhat-rstudio/rsconnect-ts@0.1.2":
-  version "0.1.2"
-  resolved "https://registry.yarnpkg.com/@meatballhat-rstudio/rsconnect-ts/-/rsconnect-ts-0.1.2.tgz#f7800b4070a4e77501f1f069423ee27d9b8a260f"
-  integrity sha512-lmUi3/KcOokBYwSfrzp0DiSJ/uwSwko1VcxlFRjQ6B+vFvsiMyEi8Ze/Wp5NBDFrzW9be429QSzaLP8t8GD51w==
+"@meatballhat-rstudio/rsconnect-ts@^0.1.3":
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/@meatballhat-rstudio/rsconnect-ts/-/rsconnect-ts-0.1.3.tgz#3351fc4ecc82fdb17f954fa7945f19477c8aa8e3"
+  integrity sha512-QKJ5wH9ppkW1f+LKCq1Io4c2aEthsV70S1t5wofyEpxrjOxQCpp0j6xZEndPJ0oMVPxJT0nAsCn94l8wL+7Kig==
   dependencies:
     "@types/tar" "^4.0.4"
     "@types/tmp" "^0.2.0"
