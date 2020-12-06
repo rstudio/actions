@@ -1,4 +1,6 @@
 import path from 'path'
+import process from 'process'
+
 import {
   ConnectPublishResult,
   connectPublish,
@@ -6,32 +8,38 @@ import {
 } from "../src/connect-publish";
 
 const HERE = path.resolve(__dirname, '.')
+const CWD = process.cwd()
 
 jest.setTimeout(1000 * 60 * 2)
 
 describe("connectPublish", () => {
-  beforeAll(() => {
+  beforeEach(() => {
     process.env['INPUT_URL'] = 'http://f1wc3w4090uv67yhud7j08zjzgvt7yfg@127.0.0.1:23939'
+    process.chdir(HERE)
+  })
+
+  afterEach(() => {
+    process.chdir(CWD)
   })
 
   const testCases = [
     {
-      dir: 'apps/plumber',
+      dir: 'testapps/plumber:/fancy/plumber/app',
       expectError: false
     },
     {
-      dir: 'apps/flask',
+      dir: 'testapps/flask:/equally/fancy/flask/app',
       expectError: false
     },
     {
-      dir: 'apps/bogus',
+      dir: 'testapps/bogus:/at/least/i/tried:/too/much/really',
       expectError: true
     }
   ]
 
   testCases.forEach((tc: any) => {
     it(`publishes ${tc.dir} to connect`, async () => {
-      process.env["INPUT_DIR"] = path.join(HERE, tc.dir)
+      process.env["INPUT_DIR"] = tc.dir
       const results = await connectPublish(loadArgs())
         .catch((err: any) => {
           if (tc.expectError) {

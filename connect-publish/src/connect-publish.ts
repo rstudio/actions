@@ -10,7 +10,7 @@ export interface ActionArgs {
 }
 
 export interface ConnectPublishResult {
-  dir: string
+  dirName: string
   success: boolean
 }
 
@@ -34,7 +34,7 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
     .then((results: ConnectPublishResult[]) => {
       const failed = results.filter((res: ConnectPublishResult) => !res.success)
       if (failed.length > 0) {
-        const failedDirs = failed.map((res: ConnectPublishResult) => res.dir)
+        const failedDirs = failed.map((res: ConnectPublishResult) => res.dirName)
         throw new ConnectPublishErrorResult(
           `unsuccessful publish of dirs=${failedDirs.join(', ')}`,
           results
@@ -61,9 +61,27 @@ async function publishFromDirs (client: rsconnect.APIClient, dirs: string[]): Pr
 }
 
 async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.Deployer, dir: string): Promise<ConnectPublishResult> {
-  core.debug(`publishing dir ${dir}`)
-  return await deployer.deployManifest(path.join(dir, 'manifest.json'), dir)
+  let dirName = dir
+  let appPath: string | undefined
+
+  if (dir.match(/[^:]+:[^:]+/) !== null) {
+    const parts = dir.split(/:/)
+    if (parts.length !== 2) {
+      core.warning(`discarding trailing value ${JSON.stringify(parts.slice(2).join(':'))} from dir ${JSON.stringify(dir)}`)
+    }
+    dirName = parts[0]
+    appPath = parts[1]
+  }
+
+  core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`)
+  return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
     .then((resp: rsconnect.DeployTaskResponse) => {
+      core.info([
+        `deploying ${dirName} to ${resp.appUrl}`,
+        `     id: ${resp.appId}`,
+        `   guid: ${resp.appGuid}`,
+        `  title: ${resp.title}`
+      ].join('\n'))
       return new rsconnect.ClientTaskPoller(client, resp.taskId)
     })
     .then(async (poller: rsconnect.ClientTaskPoller) => {
@@ -77,14 +95,14 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
           success = false
         }
       }
-      return { dir, success }
+      return { dirName, success }
     })
     .catch((err: any) => {
       if (core.isDebug()) {
         console.trace(err)
       }
       core.error(err as Error)
-      return { dir, success: false }
+      return { dirName, success: false }
     })
 }
 
@@ -96,12 +114,12 @@ export function loadArgs (): ActionArgs {
   const url = new URL(rawURL)
   if (url.password !== '') {
     if (apiKeySpecified) {
-      core.info('using api key from URL password instead of api-key input')
+      core.debug('using api key from URL password instead of api-key input')
     }
     apiKey = url.password
   } else if (url.username !== '') {
     if (apiKeySpecified) {
-      core.info('using api key from URL username instead of api-key input')
+      core.debug('using api key from URL username instead of api-key input')
     }
     apiKey = url.username
   }

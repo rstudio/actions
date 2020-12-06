@@ -407,6 +407,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.APIClient = void 0;
 const axios_1 = __importDefault(__webpack_require__(614));
 const fs_1 = __importDefault(__webpack_require__(5747));
+const debugLog_1 = __webpack_require__(3123);
 const conversions_1 = __webpack_require__(3301);
 class APIClient {
     constructor(cfg) {
@@ -417,6 +418,29 @@ class APIClient {
                 Authorization: `Key ${this.cfg.apiKey}`
             }
         });
+        if (debugLog_1.debugEnabled) {
+            this.client.interceptors.request.use((r) => {
+                debugLog_1.debugLog(() => {
+                    var _a;
+                    return [
+                        'APIClient: request',
+                        (_a = r.method) === null || _a === void 0 ? void 0 : _a.toUpperCase(),
+                        JSON.stringify(r.url),
+                        `params=${JSON.stringify(r.params)}`,
+                        `headers=${JSON.stringify(r.headers)}`
+                    ].join(' ');
+                });
+                return r;
+            });
+            this.client.interceptors.response.use((r) => {
+                debugLog_1.debugLog(() => [
+                    'APIClient: response',
+                    `status=${r.status}`,
+                    `headers=${JSON.stringify(r.headers)}`
+                ].join(' '));
+                return r;
+            });
+        }
     }
     async createApp(appName) {
         return await this.client.post('applications', { name: appName })
@@ -486,29 +510,75 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ApplicationPather = void 0;
 const path_1 = __importDefault(__webpack_require__(5622));
+const debugLog_1 = __webpack_require__(3123);
 const MiniGit_1 = __webpack_require__(8236);
 class ApplicationPather {
-    constructor() {
-        this.git = new MiniGit_1.MiniGit();
+    constructor(git) {
+        this.git = (git !== undefined && git !== null
+            ? git
+            : new MiniGit_1.MiniGit());
     }
     resolve(manifestPath, appPath) {
         if (appPath !== null && appPath !== undefined) {
+            debugLog_1.debugLog(() => `ApplicationPather: returning non-empty app path=${appPath}`);
             return this.strictAppPath(appPath);
         }
         if (manifestPath === null || manifestPath === undefined) {
+            debugLog_1.debugLog(() => 'ApplicationPather: returning empty app path');
             return '';
         }
         const gitTopLevel = this.git.showTopLevel();
         if (gitTopLevel === null) {
-            return this.strictAppPath(path_1.default.basename(path_1.default.dirname(manifestPath)));
+            const gitLessPath = path_1.default.basename(path_1.default.dirname(manifestPath));
+            debugLog_1.debugLog(() => `ApplicationPather: returning without git prefix removed app path=${gitLessPath}`);
+            return this.strictAppPath(gitLessPath);
         }
-        const relPath = path_1.default.dirname(manifestPath).replace(gitTopLevel, '');
-        return this.strictAppPath(relPath);
+        let gitPrefix = '';
+        const gitRemoteURL = this.git.remoteURL();
+        if (gitRemoteURL === null) {
+            const curGrandparentDir = path_1.default.resolve(process.cwd(), '../..');
+            gitPrefix = path_1.default.dirname(path_1.default.dirname(manifestPath)).replace(curGrandparentDir, '');
+        }
+        else {
+            gitPrefix = this.pathFromGitRemoteURL(gitRemoteURL);
+        }
+        const relPath = this.strictAppPath([
+            gitPrefix,
+            path_1.default.dirname(manifestPath).replace(gitTopLevel, '')
+        ].join('/'));
+        debugLog_1.debugLog(() => `ApplicationPather: returning with git prefix=${gitPrefix} path=${relPath}`);
+        return relPath;
     }
     strictAppPath(appPath) {
-        return ('/' +
+        const inSlashes = ('/' +
             appPath.trim().replace(/${path.sep}/g, '/') +
-            '/').replace(/\.\//g, '/').replace(/\/\//g, '/').replace(/_+/, '_');
+            '/');
+        return inSlashes
+            .replace(/\.\//g, '/')
+            .replace(/ +/g, '_')
+            .replace(/\./g, '_')
+            .replace(/\/\//g, '/')
+            .replace(/\/_+/, '/_');
+    }
+    pathFromGitRemoteURL(gitRemoteURL) {
+        let rawURL = gitRemoteURL;
+        if (gitRemoteURL.match(new RegExp('[^/]+:[^/]+')) !== null) {
+            rawURL = 'ssh://' + gitRemoteURL.replace(/:/, '/');
+        }
+        try {
+            const parsedURL = new URL(rawURL);
+            return this.sansScheme(this.sansTrailingGit([parsedURL.host, parsedURL.pathname].join('/')));
+        }
+        catch (err) {
+            debugLog_1.debugLog(() => `ApplicationPather: failed to parse raw git URL ${rawURL}`);
+            return this.sansScheme(this.sansTrailingGit(rawURL));
+        }
+    }
+    sansTrailingGit(s) {
+        return s.replace(/\.git$/, '');
+    }
+    sansScheme(s) {
+        return s.replace(/^[a-z]+:\/\//i, '');
     }
 }
 exports.ApplicationPather = ApplicationPather;
@@ -636,6 +706,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Deployer = void 0;
 const crypto_1 = __importDefault(__webpack_require__(6417));
 const url_1 = __webpack_require__(8835);
+const debugLog_1 = __webpack_require__(3123);
 const Bundler_1 = __webpack_require__(7510);
 const ListApplicationsPager_1 = __webpack_require__(5154);
 const ApplicationPather_1 = __webpack_require__(2585);
@@ -651,6 +722,11 @@ class Deployer {
     async deployBundle(bundle, appPath) {
         var _a;
         const resolvedAppPath = this.pather.resolve(bundle.manifestPath, appPath);
+        debugLog_1.debugLog(() => [
+            'Deployer: initial app path resolution',
+            `resolved=${JSON.stringify(resolvedAppPath)}`,
+            `orig=${JSON.stringify(appPath)}`
+        ].join(' '));
         let appID = null;
         let app = null;
         let reassignTitle = false;
@@ -658,33 +734,41 @@ class Deployer {
             // TODO: use an API that doesn't require scanning all applications, if possible
             const existingApp = await this.findExistingApp(resolvedAppPath);
             if (existingApp !== null) {
+                debugLog_1.debugLog(() => `Deployer: found existing app=${existingApp.id} at path=${resolvedAppPath}`);
                 appID = existingApp.id;
             }
         }
         const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
         if (appID === null) {
-            const nameInput = (manifestTitle !== null && manifestTitle !== undefined
-                ? manifestTitle
-                : resolvedAppPath);
-            const appName = this.makeDeploymentName(nameInput);
+            const appName = this.makeDeploymentName(manifestTitle, resolvedAppPath);
+            debugLog_1.debugLog(() => [
+                'Deployer: creating new app with',
+                `name=${appName} from`,
+                `title=${JSON.stringify(manifestTitle)},`,
+                `path=${resolvedAppPath}}`
+            ].join(' '));
             app = await this.client.createApp(appName);
             appID = app.id;
             reassignTitle = true;
         }
         else {
+            debugLog_1.debugLog(() => `Deployer: getting existing app with id=${appID.toString()}`);
             app = await this.client.getApp(appID);
         }
         if (app == null) {
             return await Promise.reject(new Error('unable to find or create app'));
         }
         if (!app.vanityUrl && resolvedAppPath !== '') {
+            debugLog_1.debugLog(() => `Deployer: updating vanity URL for app=${appID.toString()} to path=${resolvedAppPath}`);
             await this.client.updateAppVanityURL(appID, resolvedAppPath);
         }
         if (manifestTitle !== undefined && manifestTitle !== null && reassignTitle) {
             app.title = manifestTitle;
             await this.client.updateApp(appID, { title: app.title });
         }
+        debugLog_1.debugLog(() => `Deployer: uploading bundle for app=${appID.toString()} tarball=${bundle.tarballPath}`);
         const uploadedBundle = await this.client.uploadApp(appID, bundle);
+        debugLog_1.debugLog(() => `Deployer: deploying app=${appID.toString()} bundle=${uploadedBundle.id}`);
         return await this.client.deployApp(appID, uploadedBundle.id)
             .then((ct) => {
             const taskApp = app;
@@ -711,14 +795,19 @@ class Deployer {
         }
         return found;
     }
-    makeDeploymentName(title) {
-        if (title === null || title === undefined) {
-            title = 'unnamed ' + crypto_1.default.randomBytes(15).toString('base64');
+    makeDeploymentName(title, appPath) {
+        let name = '';
+        if ((title === null || title === undefined) || (appPath === null || appPath === undefined)) {
+            name = 'unnamed ' + crypto_1.default.randomBytes(15).toString('base64');
         }
-        let name = title.toLowerCase().replace(/ /g, '_');
-        name = name.replace(/[^A-Za-z0-9_ -]+/g, '');
-        name = name.replace(/_+/g, '_');
-        name = name.substring(0, 64);
+        if (appPath !== null && appPath !== undefined) {
+            name = [appPath, name].join('/');
+        }
+        name = name.toLowerCase()
+            .replace(/ /g, '_')
+            .replace(/[^A-Za-z0-9_ -]+/g, '')
+            .replace(/_+/g, '_')
+            .substring(0, 64);
         if (name.length < 3) {
             for (let i = name.length; i < 3; i++) {
                 name += '_';
@@ -740,6 +829,7 @@ exports.Deployer = Deployer;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ListApplicationsPager = void 0;
 const conversions_1 = __webpack_require__(3301);
+const debugLog_1 = __webpack_require__(3123);
 class ListApplicationsPager {
     constructor(client) {
         this.client = client;
@@ -757,18 +847,23 @@ class ListApplicationsPager {
             cont: ''
         };
         while (pageParams.start < maxRecords) {
+            debugLog_1.debugLog(() => `ListApplicationsPager: fetching page of applications with pageParams: ${JSON.stringify(pageParams)}`);
             const page = await this.client.listApplications(pageParams);
             if (n === 0) {
                 if (resetMaxRecords || maxRecords > page.total) {
+                    debugLog_1.debugLog(() => `ListApplicationsPager: setting max records to page total: ${page.total}`);
                     maxRecords = page.total;
                 }
             }
             for (let i = 0; i < page.applications.length; i++) {
                 if (n >= maxRecords) {
+                    debugLog_1.debugLog(() => `ListApplicationsPager: breaking at max records limit ${maxRecords.toString()}`);
                     return n;
                 }
                 n++;
-                yield conversions_1.snake2camel(page.applications[i]);
+                const appRecord = conversions_1.snake2camel(page.applications[i]);
+                debugLog_1.debugLog(() => `ListApplicationsPager: yielding app record ${JSON.stringify(appRecord)}`);
+                yield appRecord;
             }
             pageParams.cont = page.continuation;
             pageParams.start += pageParams.count;
@@ -817,7 +912,7 @@ class Manifest {
         return fileMap;
     }
     get title() {
-        let filename = null;
+        let filename = path_1.default.basename(path_1.default.dirname(this.source));
         if (this.rawData.has('metadata')) {
             const metadata = this.rawData.get('metadata');
             for (const prop of ['entrypoint', 'primary_rmd', 'primary_html']) {
@@ -827,17 +922,11 @@ class Manifest {
                     break;
                 }
             }
-            if ((filename === null || filename === void 0 ? void 0 : filename.match(/^[A-Za-z0-9_]+:[A-Za-z0-9_]+$/)) !== null) {
-                filename = null;
-            }
         }
-        if (filename == null) {
+        if (filename === null) {
             return null;
         }
-        return this.defaultTitle(filename);
-    }
-    defaultTitle(fileName) {
-        return path_1.default.basename(path_1.default.resolve(process.cwd(), fileName));
+        return filename;
     }
 }
 exports.Manifest = Manifest;
@@ -856,13 +945,51 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.MiniGit = void 0;
 const child_process_1 = __importDefault(__webpack_require__(3129));
+const debugLog_1 = __webpack_require__(3123);
 class MiniGit {
     showTopLevel() {
-        try {
-            const wt = child_process_1.default.execSync('git rev-parse --show-toplevel');
-            return wt.toString('utf-8').trim();
+        return this.tryExec('rev-parse --show-toplevel');
+    }
+    remoteURL() {
+        const branch = this.currentBranch();
+        if (branch === null) {
+            return null;
         }
-        catch (_err) {
+        const cfg = this.configLocal();
+        const branchRemoteKey = `branch.${branch}.remote`;
+        const remoteName = cfg.get(branchRemoteKey);
+        if (remoteName === undefined) {
+            return null;
+        }
+        const remoteURLKey = `remote.${remoteName}.url`;
+        const remoteURL = cfg.get(remoteURLKey);
+        if (remoteURL === undefined) {
+            return null;
+        }
+        return remoteURL;
+    }
+    currentBranch() {
+        return this.tryExec('rev-parse --abbrev-ref HEAD');
+    }
+    configLocal() {
+        const cfg = new Map();
+        const rawConfig = this.tryExec('config --list --local');
+        if (rawConfig === null) {
+            return cfg;
+        }
+        const pairs = rawConfig.split(/\n/).map((s) => s.trim().split('='));
+        for (let i = 0; i < pairs.length; i++) {
+            cfg.set(pairs[i][0], pairs[i][1]);
+        }
+        return cfg;
+    }
+    tryExec(cmd) {
+        try {
+            const result = child_process_1.default.execSync(`git ${cmd}`);
+            return result.toString('utf-8').trim();
+        }
+        catch (err) {
+            debugLog_1.debugLog(() => `MiniGit: failed to run ${cmd}: ${JSON.stringify(err)}`);
             return null;
         }
     }
@@ -891,6 +1018,42 @@ function snake2camel(obj) {
     return out;
 }
 exports.snake2camel = snake2camel;
+
+
+/***/ }),
+
+/***/ 3123:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.debugLog = exports.debugEnabled = void 0;
+const util_1 = __importDefault(__webpack_require__(1669));
+const logName = 'rsconnect-ts';
+function debugMatchLogName(s) {
+    const re = new RegExp(`^${s.replace('*', '.*')}$`);
+    return re.test(logName);
+}
+function getDebugEnabled() {
+    if (process.env.NODE_DEBUG === undefined) {
+        return false;
+    }
+    const debugParts = process.env.NODE_DEBUG.split(/\s*,\s*/g);
+    return debugParts.some(debugMatchLogName);
+}
+const rawDebugLog = util_1.default.debuglog(logName);
+exports.debugEnabled = getDebugEnabled();
+function debugLog(f) {
+    if (!exports.debugEnabled) {
+        return;
+    }
+    rawDebugLog(f());
+}
+exports.debugLog = debugLog;
 
 
 /***/ }),
@@ -15468,7 +15631,7 @@ async function connectPublish(args) {
         .then((results) => {
         const failed = results.filter((res) => !res.success);
         if (failed.length > 0) {
-            const failedDirs = failed.map((res) => res.dir);
+            const failedDirs = failed.map((res) => res.dirName);
             throw new ConnectPublishErrorResult(`unsuccessful publish of dirs=${failedDirs.join(', ')}`, results);
         }
         return results;
@@ -15491,9 +15654,25 @@ async function publishFromDirs(client, dirs) {
     return ret;
 }
 async function publishFromDir(client, deployer, dir) {
-    core.debug(`publishing dir ${dir}`);
-    return await deployer.deployManifest(path_1.default.join(dir, 'manifest.json'), dir)
+    let dirName = dir;
+    let appPath;
+    if (dir.match(/[^:]+:[^:]+/) !== null) {
+        const parts = dir.split(/:/);
+        if (parts.length !== 2) {
+            core.warning(`discarding trailing value ${JSON.stringify(parts.slice(2).join(':'))} from dir ${JSON.stringify(dir)}`);
+        }
+        dirName = parts[0];
+        appPath = parts[1];
+    }
+    core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`);
+    return await deployer.deployManifest(path_1.default.join(dirName, 'manifest.json'), appPath)
         .then((resp) => {
+        core.info([
+            `deploying ${dirName} to ${resp.appUrl}`,
+            `     id: ${resp.appId}`,
+            `   guid: ${resp.appGuid}`,
+            `  title: ${resp.title}`
+        ].join('\n'));
         return new rsconnect.ClientTaskPoller(client, resp.taskId);
     })
         .then(async (poller) => {
@@ -15507,14 +15686,14 @@ async function publishFromDir(client, deployer, dir) {
                 success = false;
             }
         }
-        return { dir, success };
+        return { dirName, success };
     })
         .catch((err) => {
         if (core.isDebug()) {
             console.trace(err);
         }
         core.error(err);
-        return { dir, success: false };
+        return { dirName, success: false };
     });
 }
 function loadArgs() {
@@ -15524,13 +15703,13 @@ function loadArgs() {
     const url = new url_1.URL(rawURL);
     if (url.password !== '') {
         if (apiKeySpecified) {
-            core.info('using api key from URL password instead of api-key input');
+            core.debug('using api key from URL password instead of api-key input');
         }
         apiKey = url.password;
     }
     else if (url.username !== '') {
         if (apiKeySpecified) {
-            core.info('using api key from URL username instead of api-key input');
+            core.debug('using api key from URL username instead of api-key input');
         }
         apiKey = url.username;
     }

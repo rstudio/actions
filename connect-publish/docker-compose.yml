@@ -4,7 +4,7 @@ services:
   db:
     image: postgres:12
     volumes:
-      - ./__tests__/pgdata:/var/lib/postgresql/data
+      - ./.cache/pgdata:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: notasecret
   connect:
@@ -15,7 +15,7 @@ services:
     # image: rstudio/rstudio-connect:1.8.6
     image: rstudio/rstudio-connect:1.8.4.2-2
     volumes:
-      - ./__tests__/data:/data
+      - ./.cache/data:/data
       - ./__tests__/rstudio-connect.test.gcfg:/etc/rstudio-connect/rstudio-connect.gcfg
     ports:
       - 23939:3939
