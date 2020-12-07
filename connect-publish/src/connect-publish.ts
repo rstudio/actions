@@ -1,7 +1,7 @@
 import path from 'path'
 import { URL } from 'url'
 import * as core from '@actions/core'
-import * as rsconnect from '@meatballhat-rstudio/rsconnect-ts'
+import * as rsconnect from '@rstudio/rsconnect-ts'
 
 export interface ActionArgs {
   apiKey: string

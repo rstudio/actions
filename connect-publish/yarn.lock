@@ -1062,14 +1062,16 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@meatballhat-rstudio/rsconnect-ts@^0.1.0":
-  version "0.1.4"
-  resolved "https://registry.yarnpkg.com/@meatballhat-rstudio/rsconnect-ts/-/rsconnect-ts-0.1.4.tgz#b349dd19a3e566f3990f4c0a1fd222992c078ae1"
-  integrity sha512-C54INts+7sqLycRIMhHHMj2ikXHknss0Ugve1GrqzxH0nRsLnKl8JQ+1YeWAOVPzCF1qEpbA4XXBgEgQcuLKwQ==
+"@rstudio/rsconnect-ts@^0.1.0":
+  version "0.1.5"
+  resolved "https://registry.yarnpkg.com/@rstudio/rsconnect-ts/-/rsconnect-ts-0.1.5.tgz#b98d907e693be8e5c2d6128768673a72aa1b7a52"
+  integrity sha512-AfujayiR3jaAJmblIZi2AGbCC2gEkqnNbaHV0y8jADdxwhmAwDsKuLGbz16z1W3jrQLssua3QdCm20x3JdIAgg==
   dependencies:
+    "@types/lodash" "^4.14.165"
     "@types/tar" "^4.0.4"
     "@types/tmp" "^0.2.0"
     axios "^0.21.0"
+    lodash "^4.17.20"
     tar "^6.0.5"
     tmp "^0.2.1"
 
@@ -1173,6 +1175,11 @@
   version "0.0.29"
   resolved "https://registry.yarnpkg.com/@types/json5/-/json5-0.0.29.tgz#ee28707ae94e11d2b827bcbe5270bcea7f3e71ee"
   integrity sha1-7ihweulOEdK4J7y+UnC86n8+ce4=
+
+"@types/lodash@^4.14.165":
+  version "4.14.165"
+  resolved "https://registry.yarnpkg.com/@types/lodash/-/lodash-4.14.165.tgz#74d55d947452e2de0742bad65270433b63a8c30f"
+  integrity sha512-tjSSOTHhI5mCHTy/OOXYIhi2Wt1qcbHmuXD1Ha7q70CgI/I71afO4XtLb/cVexki1oVYchpul/TOuu3Arcdxrg==
 
 "@types/minipass@*":
   version "2.2.0"
@@ -3764,7 +3771,7 @@ lodash.sortby@^4.7.0:
   resolved "https://registry.yarnpkg.com/lodash.sortby/-/lodash.sortby-4.7.0.tgz#edd14c824e2cc9c1e0b0a1b42bb5210516a42438"
   integrity sha1-7dFMgk4sycHgsKG0K7UhBRakJDg=
 
-lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17.19:
+lodash@^4.17.14, lodash@^4.17.15, lodash@^4.17.19, lodash@^4.17.20:
   version "4.17.20"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.20.tgz#b44a9b6297bcb698f1c51a3545a2b3b368d59c52"
   integrity sha512-PlhdFcillOINfeV7Ni6oF1TAEayyZBoZ8bcshTHqOYJYlrqzRK5hagpagky5o4HfCzzd1TRkXPMFq6cKk9rGmA==
@@ -5180,9 +5187,9 @@ ts-jest@^26.4.4:
     yargs-parser "20.x"
 
 ts-node@^9.0.0:
-  version "9.1.0"
-  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.1.0.tgz#95eae4c6d0f94f2545884078e1eb1b14d2155639"
-  integrity sha512-0yqcL4sgruCvM+w64LiAfNJo6+lHfCYc5Ajj4yiLNkJ9oZ2HWaa+Kso7htYOOxVQ7+csAjdUjffOe9PIqC4pMg==
+  version "9.1.1"
+  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.1.1.tgz#51a9a450a3e959401bda5f004a72d54b936d376d"
+  integrity sha512-hPlt7ZACERQGf03M253ytLY3dHbGNGrAq9qIHWUY9XHYl1z7wYngSr3OQ5xmui8o2AaxsONxIzjafLUiWBo1Fg==
   dependencies:
     arg "^4.1.0"
     create-require "^1.1.0"
