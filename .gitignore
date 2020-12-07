@@ -1,4 +1,5 @@
 !/setup-connect/dist/index.js
+wait-for
 
 *.lcov
 *.log

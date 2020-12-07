@@ -1,63 +1,117 @@
+import path from 'path'
 import { URL } from 'url'
 import * as core from '@actions/core'
-import * as exec from '@actions/exec'
+import * as rsconnect from '@rstudio/rsconnect-ts'
 
-class ActionArgs {
-  public apiKey: string = ''
-  public dirs: string[] = []
-  public serverName: string = ''
-  public url: string = ''
+export interface ActionArgs {
+  apiKey: string
+  dirs: string[]
+  url: string
 }
 
-export async function connectPublish (args: ActionArgs): Promise<any> {
-  return await addServer(args).then((rc: number) => {
-    if (rc !== 0) {
-      throw new Error('non-zero exit from rsconnect add')
-    }
-  })
-    .then(async () => await publishFromDirs(args.dirs, args.serverName))
-    .then((rcs: number[]) => {
-      if (rcs.some((rc: number) => rc !== 0)) {
-        throw new Error('non-zero exit from at least one publish')
+export interface ConnectPublishResult {
+  dirName: string
+  success: boolean
+}
+
+export class ConnectPublishErrorResult extends Error {
+  results: ConnectPublishResult[]
+
+  constructor (msg: string, results: ConnectPublishResult[]) {
+    super(msg)
+    this.results = results
+  }
+}
+
+export async function connectPublish (args: ActionArgs): Promise<ConnectPublishResult[]> {
+  const baseURL = `${args.url.replace(/\/+$/, '')}/__api__`
+  core.debug(`using base URL ${baseURL}`)
+
+  const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL })
+  await client.serverSettings()
+
+  return await publishFromDirs(client, args.dirs)
+    .then((results: ConnectPublishResult[]) => {
+      const failed = results.filter((res: ConnectPublishResult) => !res.success)
+      if (failed.length > 0) {
+        const failedDirs = failed.map((res: ConnectPublishResult) => res.dirName)
+        throw new ConnectPublishErrorResult(
+          `unsuccessful publish of dirs=${failedDirs.join(', ')}`,
+          results
+        )
       }
+      return results
     })
     .catch((err: any) => {
-      core.setFailed(err)
+      if (core.isDebug()) {
+        console.trace(err)
+      }
+      core.setFailed(err as Error)
+      return err.results
     })
 }
 
-async function addServer (args: ActionArgs): Promise<number> {
-  return await exec.exec('rsconnect', [
-    'add',
-    '--name', args.serverName,
-    '--server', args.url,
-    '--api-key', args.apiKey
-  ], { silent: true })
-}
-
-async function publishFromDirs (dirs: string[], serverName: string): Promise<number[]> {
-  const ret: number[] = []
+async function publishFromDirs (client: rsconnect.APIClient, dirs: string[]): Promise<ConnectPublishResult[]> {
+  const ret: ConnectPublishResult[] = []
+  const deployer = new rsconnect.Deployer(client)
   for (const dir of dirs) {
-    ret.push(await publishFromDir(dir, serverName))
+    ret.push(await publishFromDir(client, deployer, dir))
   }
   return ret
 }
 
-async function publishFromDir (dir: string, serverName: string): Promise<number> {
-  return await exec.exec('rsconnect', [
-    'deploy',
-    'manifest',
-    '--name', serverName,
-    dir
-  ])
+async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.Deployer, dir: string): Promise<ConnectPublishResult> {
+  let dirName = dir
+  let appPath: string | undefined
+
+  if (dir.match(/[^:]+:[^:]+/) !== null) {
+    const parts = dir.split(/:/)
+    if (parts.length !== 2) {
+      core.warning(`discarding trailing value ${JSON.stringify(parts.slice(2).join(':'))} from dir ${JSON.stringify(dir)}`)
+    }
+    dirName = parts[0]
+    appPath = parts[1]
+  }
+
+  if (appPath === undefined) {
+    appPath = rsconnect.ApplicationPather.strictAppPath(dirName)
+    core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`)
+  }
+
+  core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`)
+  return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
+    .then((resp: rsconnect.DeployTaskResponse) => {
+      core.info([
+        `deploying ${dirName} to ${resp.appUrl}`,
+        `     id: ${resp.appId}`,
+        `   guid: ${resp.appGuid}`,
+        `  title: ${resp.title}`
+      ].join('\n'))
+      return new rsconnect.ClientTaskPoller(client, resp.taskId)
+    })
+    .then(async (poller: rsconnect.ClientTaskPoller) => {
+      let success = true
+      for await (const result of poller.poll()) {
+        core.debug(`received poll result: ${JSON.stringify(result)}`)
+        for (const line of result.status) {
+          core.info(line)
+        }
+        if (result.type === 'build-failed-error') {
+          success = false
+        }
+      }
+      return { dirName, success }
+    })
+    .catch((err: any) => {
+      if (core.isDebug()) {
+        console.trace(err)
+      }
+      core.error(err as Error)
+      return { dirName, success: false }
+    })
 }
 
 export function loadArgs (): ActionArgs {
-  let serverName = core.getInput('server-name')
-  if (serverName === '' || serverName === undefined || serverName === null) {
-    serverName = 'default'
-  }
-
   let apiKey = core.getInput('api-key')
   const apiKeySpecified = apiKey !== ''
 
@@ -65,12 +119,12 @@ export function loadArgs (): ActionArgs {
   const url = new URL(rawURL)
   if (url.password !== '') {
     if (apiKeySpecified) {
-      core.warning('using api key from URL password instead of api-key input')
+      core.debug('using api key from URL password instead of api-key input')
     }
     apiKey = url.password
   } else if (url.username !== '') {
     if (apiKeySpecified) {
-      core.warning('using api key from URL username instead of api-key input')
+      core.debug('using api key from URL username instead of api-key input')
     }
     apiKey = url.username
   }
@@ -82,12 +136,9 @@ export function loadArgs (): ActionArgs {
     dirs.push('.')
   }
 
-  const args = new ActionArgs()
-
-  args.apiKey = apiKey
-  args.dirs = dirs
-  args.serverName = serverName
-  args.url = url.toString()
-
-  return args
+  return {
+    apiKey,
+    dirs,
+    url: url.toString()
+  }
 }

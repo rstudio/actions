@@ -1,0 +1,42 @@
+; RStudio Connect test environment configuration
+
+[Applications]
+RunAs = rstudio-connect
+
+[Authentication]
+Provider = password
+
+[Database]
+Provider = Postgres
+SeedUsers = true
+
+[Debug]
+Log = router
+Log = services
+Log = url-normalization
+
+[HTTP]
+Listen = :3939
+NoWarning = true
+
+[Mount]
+BaseDir = /connect-test-mount
+
+[Postgres]
+URL = postgres://postgres:notasecret@db/postgres?sslmode=disable
+
+[Python]
+Enabled = true
+Executable = /opt/python/3.6.5/bin/python
+
+[RPackageRepository "CRAN"]
+URL = https://packagemanager.rstudio.com/cran/__linux__/bionic/latest
+
+[RPackageRepository "RSPM"]
+URL = https://packagemanager.rstudio.com/cran/__linux__/bionic/latest
+
+[Server]
+DataDir = /data
+EmailProvider = print
+DatabaseEmailSettings = true
+Address = http://127.0.0.1:23939

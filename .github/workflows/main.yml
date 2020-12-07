@@ -14,19 +14,18 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+    defaults:
+      run:
+        working-directory: setup-connect
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: setup-connect
       - run: yarn lint
-        working-directory: setup-connect
       - run: yarn build
-        working-directory: setup-connect
       - run: yarn test
-        working-directory: setup-connect
       - run: git diff --exit-code --ignore-all-space
       - uses: actions/setup-python@v2
         with:
@@ -48,31 +47,37 @@ jobs:
       - run: Rscript --vanilla -e "packageVersion('rsconnect')"
   connect-publish:
     runs-on: ${{ matrix.os }}
+    env:
+      RSC_LICENSE: ${{ secrets.RSC_LICENSE }}
     strategy:
       fail-fast: false
       matrix:
         os:
           - ubuntu-latest
+    defaults:
+      run:
+        working-directory: connect-publish
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '12'
       - run: yarn install
-        working-directory: connect-publish
       - run: yarn lint
-        working-directory: connect-publish
       - run: yarn build
-        working-directory: connect-publish
+      - run: docker-compose up -d
       - run: yarn test
-        working-directory: connect-publish
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - uses: ./setup-connect
-        with:
-          r: false
+        env:
+          RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
       - uses: ./connect-publish
+        id: connect-publish
         with:
-          url: http://bogus@connect.example.org
-        continue-on-error: true
+          url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
+          dir: |
+            connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
+            connect-publish/__tests__/testapps/flask:/dont-forget-to-flask
+      - run: printf '${{ steps.connect-publish.outputs.results }}\n' | jq .
+      - if: failure()
+        run: docker-compose logs
+      - if: always()
+        run: docker-compose down --remove-orphans

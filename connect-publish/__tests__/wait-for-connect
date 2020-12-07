@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -o errexit
+set -o pipefail
+
+main() {
+  if [[ ! "${RSTUDIO_CONNECT_API_KEY}" ]]; then
+    printf 'ERROR: missing $RSTUDIO_CONNECT_API_KEY\n' >&2
+    exit 86
+  fi
+
+  local api_key="${RSTUDIO_CONNECT_API_KEY}"
+  local host_port="${RSTUDIO_CONNECT_HOST_PORT:-127.0.0.1:23939}"
+
+  local top
+  top="$(git rev-parse --show-toplevel)"
+  cd "${top}/connect-publish"
+
+  local wait_for="${top}/connect-publish/__tests__/wait-for"
+
+  if [[ ! -x "${wait_for}" ]]; then
+    curl -o "${wait_for}" -fsSL https://raw.githubusercontent.com/eficode/wait-for/master/wait-for
+    chmod +x "${wait_for}"
+  fi
+
+  sha1sum ./__tests__/rstudio-connect.test.gcfg
+  docker-compose exec -T connect sha1sum /etc/rstudio-connect/rstudio-connect.gcfg
+
+  "${wait_for}" -t 60 "${host_port}" -- \
+    printf 'INFO: %s is responding\n' "${host_port}"
+
+  local retry_count=0
+  local sleep_interval=1
+  while [[ "${retry_count}" -lt 9 ]]; do
+    if curl -fL -vvv -H "Authorization: Key ${api_key}" \
+      "http://${host_port}/__api__/server_settings"; then
+      printf 'INFO: successfully got server info\n'
+      exit 0
+    fi
+    printf 'INFO: retry_count=%s; waiting %ss before next retry\n' \
+      "${retry_count}" "${sleep_interval}"
+    sleep "${sleep_interval}"
+    retry_count=$((retry_count + 1))
+    sleep_interval=$((sleep_interval * 2))
+  done
+
+  exit 1
+}
+
+main "${@}"

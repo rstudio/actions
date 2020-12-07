@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  db:
+    image: postgres:12
+    volumes:
+      - ./.cache/pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: notasecret
+  connect:
+    privileged: true
+    depends_on:
+      - db
+    # TODO: when available
+    # image: rstudio/rstudio-connect:1.8.6
+    image: rstudio/rstudio-connect:1.8.4.2-2
+    volumes:
+      - ./.cache/data:/data
+      - ./__tests__/rstudio-connect.test.gcfg:/etc/rstudio-connect/rstudio-connect.gcfg
+    ports:
+      - 23939:3939
+    environment:
+      RSC_LICENSE: $RSC_LICENSE
