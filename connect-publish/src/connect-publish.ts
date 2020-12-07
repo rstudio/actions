@@ -36,13 +36,13 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
 
   return await publishFromDirs(client, args.dirs)
     .then((results: ConnectPublishResult[]) => {
-      core.info('\n' + chalk.bold.blue('connect-publish results:'))
+      core.info('\n' + chalk.blue('connect-publish results:'))
       results.forEach((res: ConnectPublishResult) => {
-        const successColor = res.success ? chalk.bold.green : chalk.bold.red
+        const successColor = res.success ? chalk.green : chalk.red
         const successChar = res.success ? '✔' : '✘'
         core.info('  ' + ([
-          `   dir: ${chalk.bold.white(res.dir)}`,
-          `   url: ${chalk.bold.white(res.url)}`,
+          `   dir: ${chalk.white(res.dir)}`,
+          `   url: ${chalk.white(res.url)}`,
           `status: ${successColor(successChar)}`
         ].join('\n  ') + '\n'))
       })
@@ -99,10 +99,10 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
   return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
     .then((resp: rsconnect.DeployTaskResponse) => {
       core.info([
-        `publishing ${chalk.bold.white(dirName)} to ${chalk.bold.white(resp.appUrl)}`,
-        `     id: ${chalk.bold.white(resp.appId)}`,
-        `   guid: ${chalk.bold.white(resp.appGuid)}`,
-        `  title: ${chalk.bold.white(resp.title)}`
+        `publishing ${chalk.white(dirName)} to ${chalk.white(resp.appUrl)}`,
+        `     id: ${chalk.white(resp.appId)}`,
+        `   guid: ${chalk.white(resp.appGuid)}`,
+        `  title: ${chalk.white(resp.title)}`
       ].join('\n'))
       return {
         resp,
