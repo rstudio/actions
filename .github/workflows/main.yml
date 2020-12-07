@@ -70,11 +70,13 @@ jobs:
         env:
           RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
       - uses: ./connect-publish
+        id: connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
           dir: |
             connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
             connect-publish/__tests__/testapps/flask:/dont-forget-to-flask
+      - run: jq . <<<${{ steps.connect-publish.outputs.results }}
       - if: failure()
         run: docker-compose logs
       - if: always()

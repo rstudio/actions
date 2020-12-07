@@ -34123,8 +34123,12 @@ const core = __importStar(__webpack_require__(2186));
 const connect_publish_1 = __webpack_require__(349);
 function run() {
     connect_publish_1.connectPublish(connect_publish_1.loadArgs())
+        .then((results) => {
+        core.setOutput('results', JSON.stringify(results));
+    })
         .catch((err) => {
         core.setFailed(err);
+        core.setOutput('results', JSON.stringify([]));
     });
 }
 exports.run = run;

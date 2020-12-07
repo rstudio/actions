@@ -37,7 +37,11 @@ part.
 
 ## Outputs
 
-(None)
+### `results`
+
+JSON-serialized array of objects, each containing a `dirName` and
+`success` key indicating per-directory publish success. In case of
+an unhandled error, the value will be an empty array.
 
 ## Example usage
 
