@@ -76,7 +76,7 @@ jobs:
           dir: |
             connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
             connect-publish/__tests__/testapps/flask:/dont-forget-to-flask
-      - run: jq . <<<${{ steps.connect-publish.outputs.results }}
+      - run: jq . <<<'${{ steps.connect-publish.outputs.results }}'
       - if: failure()
         run: docker-compose logs
       - if: always()
