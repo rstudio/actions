@@ -1,6 +1,9 @@
 import path from 'path'
 import { URL } from 'url'
+
 import * as core from '@actions/core'
+import chalk from 'chalk'
+
 import * as rsconnect from '@rstudio/rsconnect-ts'
 
 export interface ActionArgs {
@@ -10,7 +13,8 @@ export interface ActionArgs {
 }
 
 export interface ConnectPublishResult {
-  dirName: string
+  dir: string
+  url: string
   success: boolean
 }
 
@@ -32,14 +36,26 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
 
   return await publishFromDirs(client, args.dirs)
     .then((results: ConnectPublishResult[]) => {
+      core.info('\n' + chalk.bold.blue('connect-publish results:'))
+      results.forEach((res: ConnectPublishResult) => {
+        const successColor = res.success ? chalk.bold.green : chalk.bold.red
+        const successChar = res.success ? '✔' : '✘'
+        core.info('  ' + ([
+          `   dir: ${chalk.bold.white(res.dir)}`,
+          `   url: ${chalk.bold.white(res.url)}`,
+          `status: ${successColor(successChar)}`
+        ].join('\n  ') + '\n'))
+      })
+
       const failed = results.filter((res: ConnectPublishResult) => !res.success)
       if (failed.length > 0) {
-        const failedDirs = failed.map((res: ConnectPublishResult) => res.dirName)
+        const failedDirs = failed.map((res: ConnectPublishResult) => res.dir)
         throw new ConnectPublishErrorResult(
           `unsuccessful publish of dirs=${failedDirs.join(', ')}`,
           results
         )
       }
+      core.setOutput('results', JSON.stringify(results))
       return results
     })
     .catch((err: any) => {
@@ -47,6 +63,7 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
         console.trace(err)
       }
       core.setFailed(err as Error)
+      core.setOutput('results', JSON.stringify([]))
       return err.results
     })
 }
@@ -82,14 +99,20 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
   return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
     .then((resp: rsconnect.DeployTaskResponse) => {
       core.info([
-        `deploying ${dirName} to ${resp.appUrl}`,
-        `     id: ${resp.appId}`,
-        `   guid: ${resp.appGuid}`,
-        `  title: ${resp.title}`
+        `publishing ${chalk.bold.white(dirName)} to ${chalk.bold.white(resp.appUrl)}`,
+        `     id: ${chalk.bold.white(resp.appId)}`,
+        `   guid: ${chalk.bold.white(resp.appGuid)}`,
+        `  title: ${chalk.bold.white(resp.title)}`
       ].join('\n'))
-      return new rsconnect.ClientTaskPoller(client, resp.taskId)
+      return {
+        resp,
+        poller: new rsconnect.ClientTaskPoller(client, resp.taskId)
+      }
     })
-    .then(async (poller: rsconnect.ClientTaskPoller) => {
+    .then(async ({ resp, poller }: {
+      resp: rsconnect.DeployTaskResponse
+      poller: rsconnect.ClientTaskPoller
+    }): Promise<ConnectPublishResult> => {
       let success = true
       for await (const result of poller.poll()) {
         core.debug(`received poll result: ${JSON.stringify(result)}`)
@@ -100,14 +123,22 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
           success = false
         }
       }
-      return { dirName, success }
+      return {
+        dir: dirName,
+        url: resp.appUrl,
+        success
+      }
     })
     .catch((err: any) => {
       if (core.isDebug()) {
         console.trace(err)
       }
       core.error(err as Error)
-      return { dirName, success: false }
+      return {
+        dir: dirName,
+        url: '',
+        success: false
+      }
     })
 }
 

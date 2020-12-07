@@ -24,7 +24,8 @@
   "dependencies": {
     "@actions/core": "^1.2.6",
     "@actions/exec": "^1.0.4",
-    "@rstudio/rsconnect-ts": "^0.1.0"
+    "@rstudio/rsconnect-ts": "^0.1.0",
+    "chalk": "^4.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.3",
