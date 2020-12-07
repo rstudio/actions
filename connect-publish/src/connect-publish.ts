@@ -73,6 +73,11 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
     appPath = parts[1]
   }
 
+  if (appPath === undefined) {
+    appPath = rsconnect.ApplicationPather.strictAppPath(dirName)
+    core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`)
+  }
+
   core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`)
   return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
     .then((resp: rsconnect.DeployTaskResponse) => {

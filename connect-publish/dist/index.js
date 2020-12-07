@@ -521,7 +521,7 @@ class ApplicationPather {
     resolve(manifestPath, appPath) {
         if (appPath !== null && appPath !== undefined) {
             debugLog_1.debugLog(() => `ApplicationPather: returning non-empty app path=${appPath}`);
-            return this.strictAppPath(appPath);
+            return ApplicationPather.strictAppPath(appPath);
         }
         if (manifestPath === null || manifestPath === undefined) {
             debugLog_1.debugLog(() => 'ApplicationPather: returning empty app path');
@@ -530,33 +530,47 @@ class ApplicationPather {
         const gitTopLevel = this.git.showTopLevel();
         if (gitTopLevel === null) {
             const gitLessPath = path_1.default.basename(path_1.default.dirname(manifestPath));
-            debugLog_1.debugLog(() => `ApplicationPather: returning without git prefix removed app path=${gitLessPath}`);
-            return this.strictAppPath(gitLessPath);
+            debugLog_1.debugLog(() => [
+                'ApplicationPather: returning without git prefix removed app',
+                `path=${JSON.stringify(gitLessPath)}`
+            ].join(' '));
+            return ApplicationPather.strictAppPath(gitLessPath);
         }
         let gitPrefix = '';
         const gitRemoteURL = this.git.remoteURL();
         if (gitRemoteURL === null) {
-            const curGrandparentDir = path_1.default.resolve(process.cwd(), '../..');
-            gitPrefix = path_1.default.dirname(path_1.default.dirname(manifestPath)).replace(curGrandparentDir, '');
+            const curDir = (process.env.PWD !== undefined
+                ? process.env.PWD
+                : process.cwd());
+            gitPrefix = path_1.default.basename(curDir);
+            debugLog_1.debugLog(() => [
+                'ApplicationPather: deriving git',
+                `prefix=${JSON.stringify(gitPrefix)}`,
+                'from current',
+                `dir=${JSON.stringify(curDir)}`
+            ].join(' '));
         }
         else {
             gitPrefix = this.pathFromGitRemoteURL(gitRemoteURL);
         }
-        const relPath = this.strictAppPath([
+        const relPath = ApplicationPather.strictAppPath([
             gitPrefix,
             path_1.default.dirname(manifestPath).replace(gitTopLevel, '')
         ].join('/'));
-        debugLog_1.debugLog(() => `ApplicationPather: returning with git prefix=${gitPrefix} path=${relPath}`);
+        debugLog_1.debugLog(() => [
+            'ApplicationPather: returning with git',
+            `prefix=${JSON.stringify(gitPrefix)}`,
+            `path=${JSON.stringify(relPath)}`
+        ].join(' '));
         return relPath;
     }
-    strictAppPath(appPath) {
+    static strictAppPath(appPath) {
         const inSlashes = ('/' +
             appPath.trim().replace(/${path.sep}/g, '/') +
             '/');
         return inSlashes
             .replace(/\.\//g, '/')
-            .replace(/ +/g, '_')
-            .replace(/\./g, '_')
+            .replace(new RegExp('( +|[^-_a-z0-9/])', 'ig'), '_')
             .replace(/\/\//g, '/')
             .replace(/\/_+/, '/_');
     }
@@ -1064,9 +1078,11 @@ exports.debugLog = debugLog;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ListApplicationsPager = exports.Deployer = exports.ClientTaskPoller = exports.APIClient = void 0;
+exports.ListApplicationsPager = exports.Deployer = exports.ClientTaskPoller = exports.ApplicationPather = exports.APIClient = void 0;
 var APIClient_1 = __webpack_require__(5873);
 Object.defineProperty(exports, "APIClient", ({ enumerable: true, get: function () { return APIClient_1.APIClient; } }));
+var ApplicationPather_1 = __webpack_require__(2585);
+Object.defineProperty(exports, "ApplicationPather", ({ enumerable: true, get: function () { return ApplicationPather_1.ApplicationPather; } }));
 var ClientTaskPoller_1 = __webpack_require__(6592);
 Object.defineProperty(exports, "ClientTaskPoller", ({ enumerable: true, get: function () { return ClientTaskPoller_1.ClientTaskPoller; } }));
 var Deployer_1 = __webpack_require__(3074);
@@ -15663,6 +15679,10 @@ async function publishFromDir(client, deployer, dir) {
         }
         dirName = parts[0];
         appPath = parts[1];
+    }
+    if (appPath === undefined) {
+        appPath = rsconnect.ApplicationPather.strictAppPath(dirName);
+        core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`);
     }
     core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`);
     return await deployer.deployManifest(path_1.default.join(dirName, 'manifest.json'), appPath)

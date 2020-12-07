@@ -28,7 +28,7 @@ describe("connectPublish", () => {
       expectError: false
     },
     {
-      dir: 'testapps/flask:/equally/fancy/flask/app',
+      dir: 'testapps/flask',
       expectError: false
     },
     {

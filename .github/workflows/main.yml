@@ -69,9 +69,6 @@ jobs:
       - run: yarn test
         env:
           RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
-      - run: yarn test
-        env:
-          RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
       - uses: ./connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939

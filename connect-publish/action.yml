@@ -5,16 +5,10 @@ inputs:
   api-key:
     description: API key generated in RStudio Connect
   dir:
-    description: >
-      Directory or directories containing the content or app to publish,
-      optionally with ":<deployment-path>" suffixes, separated by newlines
+    description: Directory or directories containing the content to publish
     default: .
-  type:
-    description: The type of content or app to publish
   url:
-    description: >
-      RStudio Connect URL, optionally including an API key as username or
-      password part
+    description: RStudio Connect URL
 runs:
   using: node12
   main: dist/index.js
