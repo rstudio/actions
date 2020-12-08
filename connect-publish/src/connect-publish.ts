@@ -2,7 +2,7 @@ import path from 'path'
 import { URL } from 'url'
 
 import * as core from '@actions/core'
-import chalk from 'chalk'
+import style from 'ansi-styles'
 
 import * as rsconnect from '@rstudio/rsconnect-ts'
 
@@ -36,14 +36,14 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
 
   return await publishFromDirs(client, args.dirs)
     .then((results: ConnectPublishResult[]) => {
-      core.info('\n' + chalk.blue('connect-publish results:'))
+      core.info(`\n${style.blue.open}${style.modifier.bold.open}connect-publish results:${style.reset.close}`)
       results.forEach((res: ConnectPublishResult) => {
-        const successColor = res.success ? chalk.green : chalk.red
+        const successColor = res.success ? style.green : style.red
         const successChar = res.success ? '✔' : '✘'
         core.info('  ' + ([
-          `   dir: ${chalk.white(res.dir)}`,
-          `   url: ${chalk.white(res.url)}`,
-          `status: ${successColor(successChar)}`
+          `   dir: ${style.white.open}${style.modifier.bold.open}${res.dir}${style.reset.close}`,
+          `   url: ${style.white.open}${style.modifier.bold.open}${res.url}${style.reset.close}`,
+          `status: ${successColor.open}${style.modifier.bold.open}${successChar}${style.reset.close}`
         ].join('\n  ') + '\n'))
       })
 
@@ -99,10 +99,10 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
   return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
     .then((resp: rsconnect.DeployTaskResponse) => {
       core.info([
-        `publishing ${chalk.white(dirName)} to ${chalk.white(resp.appUrl)}`,
-        `     id: ${chalk.white(resp.appId)}`,
-        `   guid: ${chalk.white(resp.appGuid)}`,
-        `  title: ${chalk.white(resp.title)}`
+        `publishing ${style.white.open}${style.modifier.bold.open}${dirName}${style.reset.close} to ${style.white.open}${style.modifier.bold.open}${resp.appUrl}${style.reset.close}`,
+        `     id: ${style.white.open}${style.modifier.bold.open}${resp.appId}${style.reset.close}`,
+        `   guid: ${style.white.open}${style.modifier.bold.open}${resp.appGuid}${style.reset.close}`,
+        `  title: ${style.white.open}${style.modifier.bold.open}${resp.title}${style.reset.close}`
       ].join('\n'))
       return {
         resp,
