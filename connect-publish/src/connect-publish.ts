@@ -246,9 +246,8 @@ export function loadArgs (): ActionArgs {
     dirs.push('.')
   }
 
-  const truthy = ['true', 'yes', 'ok', 'on']
-  const force = truthy.includes(core.getInput('force').toLowerCase().trim())
-  const showLogs = truthy.includes(core.getInput('show-logs').toLowerCase().trim())
+  const force = asBool(core.getInput('force'))
+  const showLogs = asBool(core.getInput('show-logs'))
 
   let accessType: string | undefined = core.getInput('access-type').toLowerCase().trim()
   if (accessType === '') {
@@ -265,5 +264,23 @@ export function loadArgs (): ActionArgs {
     force,
     showLogs,
     accessType
+  }
+}
+
+function asBool (s: string): boolean {
+  const trimmed = s.toLowerCase().trim()
+  if (trimmed === '') {
+    return false
+  }
+  try {
+    return JSON.parse(trimmed)
+  } catch (err: any) {
+    core.debug([
+      'could not parse',
+      JSON.stringify(trimmed),
+      'as boolean',
+      `err=${JSON.stringify(err)}`
+    ].join(' '))
+    return false
   }
 }
