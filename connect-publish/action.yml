@@ -12,6 +12,9 @@ inputs:
   force:
     description: Force publish even if up to date
     default: false
+  show-logs:
+    description: Show all publishing logs
+    default: false
   url:
     description: RStudio Connect URL
 runs:

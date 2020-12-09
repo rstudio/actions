@@ -25,19 +25,21 @@ part.
 Directory or directories containing the content to publish,
 optionally with `:<vanity-URL>` suffixes, separated by newlines.
 Without a `:<vanity-URL>` suffix, the value of the directory path
-will be used to match any existing published content. Default `"."`
-(current directory).
+will be used to match any existing published content. (Default
+`"."`)
 
 ### `api-key`
 
 An [API key genereted in RStudio
 Connect](https://docs.rstudio.com/connect/__unreleased__/user/api-keys/).
 This value may be included in `url` as the "user" or "password"
-part.
+part. (No default)
 
 ### `access-type`
 
-Access type to apply to published content. Valid values are:
+Access type to apply to published content. (No default)
+
+Valid values are:
 
 - `all`  publicly accessible
 - `logged_in` accessible only when logged into RStudio Connect
@@ -47,9 +49,13 @@ When not specified, the RStudio Connect server configuration
 default applies. Access types disallowed by RStudio Connect server
 configuration will result in the publish being canceled.
 
+### `show-logs`
+
+Show all publishing logs. (Default `false`)
+
 ### `force`
 
-Force publish even if up to date.
+Force publish even if up to date. (Default `false`)
 
 > **NOTE**: The determination of a given publish being up to date
 > is based on the bundle generated from the manifest matching the

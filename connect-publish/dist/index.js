@@ -34283,7 +34283,8 @@ async function connectPublish(args) {
     core.debug(`using base URL ${baseURL}`);
     const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL });
     await client.serverSettings();
-    return await publishFromDirs(client, args.dirs, args.force, args.accessType)
+    const { dirs, force, showLogs, accessType } = args;
+    return await publishFromDirs({ client, dirs, force, showLogs, accessType })
         .then((results) => {
         core.info(`\n${bold('connect-publish results', ansi_styles_1.default.blue)}${bold(':')}`);
         results.forEach((res) => {
@@ -34327,15 +34328,17 @@ async function connectPublish(args) {
     });
 }
 exports.connectPublish = connectPublish;
-async function publishFromDirs(client, dirs, force, accessType) {
+async function publishFromDirs({ client, dirs, showLogs, force, accessType }) {
     const ret = [];
     const deployer = new rsconnect.Deployer(client);
     for (const dir of dirs) {
-        ret.push(await publishFromDir(client, deployer, dir, force, accessType));
+        ret.push(await publishFromDir(deployer, dir, {
+            client, showLogs, force, accessType, dirs: []
+        }));
     }
     return ret;
 }
-async function publishFromDir(client, deployer, dir, force, accessType) {
+async function publishFromDir(deployer, dir, { client, showLogs, force, accessType }) {
     let dirName = dir;
     let appPath;
     if (dir.match(/[^:]+:[^:]+/) !== null) {
@@ -34377,15 +34380,18 @@ async function publishFromDir(client, deployer, dir, force, accessType) {
         ].join('\n'));
         return {
             resp,
+            showLogs,
             poller: new rsconnect.ClientTaskPoller(client, resp.taskId)
         };
     })
-        .then(async ({ resp, poller }) => {
+        .then(async ({ resp, poller, showLogs }) => {
         let success = resp.noOp ? 'SKIP' : true;
         for await (const result of poller.poll()) {
             core.debug(`received poll result: ${JSON.stringify(result)}`);
             for (const line of result.status) {
-                core.info(line);
+                if (showLogs) {
+                    core.info(line);
+                }
             }
             if (result.type === 'build-failed-error') {
                 success = false;
@@ -34432,7 +34438,9 @@ function loadArgs() {
     if (dirs.length === 0) {
         dirs.push('.');
     }
-    const force = ['true', 'yes', 'ok', 'on'].includes(core.getInput('force').toLowerCase().trim());
+    const truthy = ['true', 'yes', 'ok', 'on'];
+    const force = truthy.includes(core.getInput('force').toLowerCase().trim());
+    const showLogs = truthy.includes(core.getInput('show-logs').toLowerCase().trim());
     let accessType = core.getInput('access-type').toLowerCase().trim();
     if (accessType === '') {
         accessType = undefined;
@@ -34446,6 +34454,7 @@ function loadArgs() {
         dirs,
         url: url.toString(),
         force,
+        showLogs,
         accessType
     };
 }
