@@ -2,11 +2,16 @@ name: Publish to RStudio Connect
 description: Publish to RStudio Connect via the rsconnect CLI
 author: RStudio Developers
 inputs:
+  access-type:
+    description: Access type to apply to published content
   api-key:
     description: API key generated in RStudio Connect
   dir:
     description: Directory or directories containing the content to publish
     default: .
+  force:
+    description: Force publish even if up to date
+    default: false
   url:
     description: RStudio Connect URL
 runs:

@@ -484,6 +484,10 @@ class APIClient {
             ? { params: { first_status: status } }
             : undefined).then((resp) => conversions_1.keysToCamel(resp.data));
     }
+    async getBundle(bundleId) {
+        return await this.client.get(`bundles/${bundleId.toString()}`)
+            .then((resp) => conversions_1.keysToCamel(resp.data));
+    }
     async serverSettings(sub) {
         let path = 'server_settings';
         if (sub !== undefined) {
@@ -613,7 +617,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Bundle = void 0;
+const crypto_1 = __importDefault(__webpack_require__(6417));
+const fs_1 = __importDefault(__webpack_require__(5747));
 const tmp_1 = __importDefault(__webpack_require__(8517));
+const debugLog_1 = __webpack_require__(3802);
 if (process.env.DEBUG !== 'enabled') {
     tmp_1.default.setGracefulCleanup();
 }
@@ -628,6 +635,34 @@ class Bundle {
     }
     get tarballPath() {
         return this.f.name;
+    }
+    sha1() {
+        try {
+            return crypto_1.default.createHash('sha1')
+                .update(fs_1.default.readFileSync(this.tarballPath))
+                .digest('hex');
+        }
+        catch (err) {
+            debugLog_1.debugLog(() => [
+                'Bundle: could not get sha1 of',
+                `tarball=${JSON.stringify(this.tarballPath)}`,
+                `err=${JSON.stringify(err)}`
+            ].join(' '));
+            return '0000000000000000000000000000000000000000';
+        }
+    }
+    size() {
+        try {
+            return fs_1.default.statSync(this.tarballPath).size;
+        }
+        catch (err) {
+            debugLog_1.debugLog(() => [
+                'Bundle: could not get size of',
+                `tarball=${JSON.stringify(this.tarballPath)}`,
+                `err=${JSON.stringify(err)}`
+            ].join(' '));
+            return -1;
+        }
     }
 }
 exports.Bundle = Bundle;
@@ -666,12 +701,13 @@ exports.Bundler = Bundler;
 /***/ }),
 
 /***/ 5893:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ClientTaskPoller = void 0;
+const debugLog_1 = __webpack_require__(3802);
 class ClientTaskPoller {
     constructor(client, taskId, sleepInterval) {
         this.client = client;
@@ -687,15 +723,31 @@ class ClientTaskPoller {
             : Infinity);
         let lastStatus;
         while ((Date.now() / 1000 | 0) < pollTimeout) {
+            if (this.taskId === '') {
+                debugLog_1.debugLog(() => 'ClientTaskPollResult: returning due to empty task id');
+                return;
+            }
+            debugLog_1.debugLog(() => `ClientTaskPollResult: sleeping ${JSON.stringify(this.sleepInterval)}`);
             await this.sleepTick();
+            debugLog_1.debugLog(() => [
+                'ClientTaskPollResult: getting',
+                `task=${JSON.stringify(this.taskId)}`,
+                `lastStatus=${JSON.stringify(lastStatus)}`
+            ].join(' '));
             const curTask = await this.client.getTask(this.taskId, lastStatus);
-            yield {
+            const res = {
                 status: curTask.status,
                 type: (_a = curTask.result) === null || _a === void 0 ? void 0 : _a.type,
                 data: (_b = curTask.result) === null || _b === void 0 ? void 0 : _b.data
             };
+            debugLog_1.debugLog(() => [
+                'ClientTaskPollResult: yielding',
+                `result=${JSON.stringify(res)}`
+            ].join(' '));
+            yield res;
             lastStatus = curTask.lastStatus;
             if (curTask.finished) {
+                debugLog_1.debugLog(() => 'ClientTaskPollResult: returning due to finished');
                 return;
             }
         }
@@ -734,10 +786,10 @@ class Deployer {
         this.bundler = new Bundler_1.Bundler();
         this.pather = new ApplicationPather_1.ApplicationPather();
     }
-    async deployManifest(manifestPath, appPath) {
-        return await this.deployBundle(await this.bundler.fromManifest(manifestPath), appPath);
+    async deployManifest(manifestPath, appPath, force, accessType) {
+        return await this.deployBundle(await this.bundler.fromManifest(manifestPath), appPath, force, accessType);
     }
-    async deployBundle(bundle, appPath) {
+    async deployBundle(bundle, appPath, force, accessType) {
         var _a;
         const resolvedAppPath = this.pather.resolve(bundle.manifestPath, appPath);
         debugLog_1.debugLog(() => [
@@ -748,6 +800,8 @@ class Deployer {
         let appID = null;
         let app = null;
         let reassignTitle = false;
+        let existingBundleSize = null;
+        let existingBundleSha1 = null;
         if (resolvedAppPath !== '') {
             // TODO: use an API that doesn't require scanning all applications, if possible
             const existingApp = await this.findExistingApp(resolvedAppPath);
@@ -758,8 +812,58 @@ class Deployer {
                     'at',
                     `path=${JSON.stringify(resolvedAppPath)}`
                 ].join(' '));
+                app = existingApp;
                 appID = existingApp.id;
+                if (existingApp.bundleId !== null && existingApp.bundleId !== undefined) {
+                    const existingBundle = await this.client.getBundle(existingApp.bundleId);
+                    if (existingBundle.size !== null && existingBundle.size !== undefined) {
+                        existingBundleSize = existingBundle.size;
+                    }
+                    else {
+                        debugLog_1.debugLog(() => [
+                            'Deployer: existing app',
+                            `bundle=${JSON.stringify(existingApp.bundleId)}`,
+                            'missing size'
+                        ].join(' '));
+                    }
+                    if (existingBundle.metadata !== null && existingBundle.metadata !== undefined) {
+                        existingBundleSha1 = existingBundle.metadata.sha1;
+                    }
+                    else {
+                        debugLog_1.debugLog(() => [
+                            'Deployer: existing app',
+                            `bundle=${JSON.stringify(existingApp.bundleId)}`,
+                            'missing sha1'
+                        ].join(' '));
+                    }
+                }
             }
+        }
+        const bundleSize = bundle.size();
+        const bundleSha1 = bundle.sha1();
+        if (app !== null &&
+            this.bundleMatchesCurrent(bundleSize, bundleSha1, existingBundleSize, existingBundleSha1) &&
+            force !== true) {
+            debugLog_1.debugLog(() => [
+                'Deployer: local bundle',
+                `size=${JSON.stringify(bundleSize)}`,
+                'or',
+                `sha1=${JSON.stringify(bundleSha1)}`,
+                'matches existing',
+                `bundle=${JSON.stringify(app === null || app === void 0 ? void 0 : app.bundleId)}`,
+                `and force=${JSON.stringify(force)},`,
+                'so returning no-op deploy result'
+            ].join(' '));
+            return {
+                taskId: '',
+                appId: app.id,
+                appGuid: app.guid,
+                appUrl: app.url,
+                title: (app.title !== undefined && app.title !== null
+                    ? app.title
+                    : ''),
+                noOp: true
+            };
         }
         const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
         if (appID === null) {
@@ -798,9 +902,22 @@ class Deployer {
             ].join(' '));
             await this.client.updateAppVanityURL(appID, resolvedAppPath);
         }
+        const appUpdates = {};
         if (manifestTitle !== undefined && manifestTitle !== null && reassignTitle) {
             app.title = manifestTitle;
-            await this.client.updateApp(appID, { title: app.title });
+            appUpdates.title = app.title;
+        }
+        if (accessType !== undefined && accessType !== null) {
+            app.accessType = accessType;
+            appUpdates.access_type = accessType;
+        }
+        if (Object.keys(appUpdates).length !== 0) {
+            debugLog_1.debugLog(() => [
+                'Deployer: updating',
+                `app=${JSON.stringify(appID)}`,
+                `with=${JSON.stringify(appUpdates)}`
+            ].join(' '));
+            await this.client.updateApp(appID, appUpdates);
         }
         debugLog_1.debugLog(() => [
             'Deployer: uploading bundle for',
@@ -823,9 +940,14 @@ class Deployer {
                 appUrl: taskApp.url,
                 title: (taskApp.title !== undefined && taskApp.title !== null
                     ? taskApp.title
-                    : '')
+                    : ''),
+                noOp: false
             };
         });
+    }
+    bundleMatchesCurrent(bundleSize, bundleSha1, existingSize, existingSha1) {
+        return ((existingSize !== null && bundleSize === existingSize) ||
+            (existingSha1 !== null && bundleSha1 === existingSha1));
     }
     async findExistingApp(appPath) {
         let found = null;
@@ -34138,6 +34260,17 @@ const url_1 = __webpack_require__(8835);
 const core = __importStar(__webpack_require__(2186));
 const ansi_styles_1 = __importDefault(__webpack_require__(2068));
 const rsconnect = __importStar(__webpack_require__(7391));
+function bold(txt, color) {
+    const c = (color !== null && color !== undefined
+        ? color
+        : ansi_styles_1.default.white);
+    return [
+        c.open,
+        ansi_styles_1.default.modifier.bold.open,
+        txt,
+        ansi_styles_1.default.reset.close
+    ].join('');
+}
 class ConnectPublishErrorResult extends Error {
     constructor(msg, results) {
         super(msg);
@@ -34150,19 +34283,33 @@ async function connectPublish(args) {
     core.debug(`using base URL ${baseURL}`);
     const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL });
     await client.serverSettings();
-    return await publishFromDirs(client, args.dirs)
+    return await publishFromDirs(client, args.dirs, args.force, args.accessType)
         .then((results) => {
-        core.info(`\n${ansi_styles_1.default.blue.open}${ansi_styles_1.default.modifier.bold.open}connect-publish results:${ansi_styles_1.default.reset.close}`);
+        core.info(`\n${bold('connect-publish results', ansi_styles_1.default.blue)}${bold(':')}`);
         results.forEach((res) => {
-            const successColor = res.success ? ansi_styles_1.default.green : ansi_styles_1.default.red;
-            const successChar = res.success ? '✔' : '✘';
+            let successColor;
+            let successChar;
+            switch (res.success) {
+                case true:
+                    successColor = ansi_styles_1.default.green;
+                    successChar = '✔';
+                    break;
+                case 'SKIP':
+                    successColor = ansi_styles_1.default.yellow;
+                    successChar = 'SKIP';
+                    break;
+                default:
+                    successColor = ansi_styles_1.default.red;
+                    successChar = '✘';
+                    break;
+            }
             core.info('  ' + ([
-                `   dir: ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${res.dir}${ansi_styles_1.default.reset.close}`,
-                `   url: ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${res.url}${ansi_styles_1.default.reset.close}`,
-                `status: ${successColor.open}${ansi_styles_1.default.modifier.bold.open}${successChar}${ansi_styles_1.default.reset.close}`
+                `   dir: ${bold(res.dir)}`,
+                `   url: ${bold(res.url)}`,
+                `status: ${bold(successChar, successColor)}`
             ].join('\n  ') + '\n'));
         });
-        const failed = results.filter((res) => !res.success);
+        const failed = results.filter((res) => res.success === false);
         if (failed.length > 0) {
             const failedDirs = failed.map((res) => res.dir);
             throw new ConnectPublishErrorResult(`unsuccessful publish of dirs=${failedDirs.join(', ')}`, results);
@@ -34180,21 +34327,26 @@ async function connectPublish(args) {
     });
 }
 exports.connectPublish = connectPublish;
-async function publishFromDirs(client, dirs) {
+async function publishFromDirs(client, dirs, force, accessType) {
     const ret = [];
     const deployer = new rsconnect.Deployer(client);
     for (const dir of dirs) {
-        ret.push(await publishFromDir(client, deployer, dir));
+        ret.push(await publishFromDir(client, deployer, dir, force, accessType));
     }
     return ret;
 }
-async function publishFromDir(client, deployer, dir) {
+async function publishFromDir(client, deployer, dir, force, accessType) {
     let dirName = dir;
     let appPath;
     if (dir.match(/[^:]+:[^:]+/) !== null) {
         const parts = dir.split(/:/);
         if (parts.length !== 2) {
-            core.warning(`discarding trailing value ${JSON.stringify(parts.slice(2).join(':'))} from dir ${JSON.stringify(dir)}`);
+            core.warning([
+                'discarding trailing value',
+                JSON.stringify(parts.slice(2).join(':')),
+                'from dir',
+                JSON.stringify(dir)
+            ].join(' '));
         }
         dirName = parts[0];
         appPath = parts[1];
@@ -34203,14 +34355,25 @@ async function publishFromDir(client, deployer, dir) {
         appPath = rsconnect.ApplicationPather.strictAppPath(dirName);
         core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`);
     }
-    core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`);
-    return await deployer.deployManifest(path_1.default.join(dirName, 'manifest.json'), appPath)
-        .then((resp) => {
+    core.debug([
+        'publishing',
+        `dir=${JSON.stringify(dirName)}`,
+        `path=${JSON.stringify(appPath)}`,
+        `force=${JSON.stringify(force)}`,
+        `accessType=${JSON.stringify(accessType)}`
+    ].join(' '));
+    return await deployer.deployManifest(path_1.default.join(dirName, 'manifest.json'), appPath, force, accessType).then((resp) => {
+        let publishing = 'publishing';
+        let why = '';
+        if (resp.noOp) {
+            publishing = bold('skipping publishing', ansi_styles_1.default.yellow);
+            why = ' (up to date)';
+        }
         core.info([
-            `publishing ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${dirName}${ansi_styles_1.default.reset.close} to ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${resp.appUrl}${ansi_styles_1.default.reset.close}`,
-            `     id: ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${resp.appId}${ansi_styles_1.default.reset.close}`,
-            `   guid: ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${resp.appGuid}${ansi_styles_1.default.reset.close}`,
-            `  title: ${ansi_styles_1.default.white.open}${ansi_styles_1.default.modifier.bold.open}${resp.title}${ansi_styles_1.default.reset.close}`
+            `${publishing} ${bold(dirName)} to ${bold(resp.appUrl)}${why}`,
+            `     id: ${bold(resp.appId.toString())}`,
+            `   guid: ${bold(resp.appGuid)}`,
+            `  title: ${bold(resp.title)}`
         ].join('\n'));
         return {
             resp,
@@ -34218,7 +34381,7 @@ async function publishFromDir(client, deployer, dir) {
         };
     })
         .then(async ({ resp, poller }) => {
-        let success = true;
+        let success = resp.noOp ? 'SKIP' : true;
         for await (const result of poller.poll()) {
             core.debug(`received poll result: ${JSON.stringify(result)}`);
             for (const line of result.status) {
@@ -34269,10 +34432,21 @@ function loadArgs() {
     if (dirs.length === 0) {
         dirs.push('.');
     }
+    const force = ['true', 'yes', 'ok', 'on'].includes(core.getInput('force').toLowerCase().trim());
+    let accessType = core.getInput('access-type').toLowerCase().trim();
+    if (accessType === '') {
+        accessType = undefined;
+    }
+    else if (!['all', 'logged_in', 'acl'].includes(accessType)) {
+        core.warning(`ignoring invalid value for access-type: ${JSON.stringify(accessType)}`);
+        accessType = undefined;
+    }
     return {
         apiKey,
         dirs,
-        url: url.toString()
+        url: url.toString(),
+        force,
+        accessType
     };
 }
 exports.loadArgs = loadArgs;
