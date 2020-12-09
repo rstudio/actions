@@ -34433,7 +34433,14 @@ function loadArgs() {
         dirs.push('.');
     }
     const force = ['true', 'yes', 'ok', 'on'].includes(core.getInput('force').toLowerCase().trim());
-    const accessType = core.getInput('access-type').toLowerCase().trim();
+    let accessType = core.getInput('access-type').toLowerCase().trim();
+    if (accessType === '') {
+        accessType = undefined;
+    }
+    else if (!['all', 'logged_in', 'acl'].includes(accessType)) {
+        core.warning(`ignoring invalid value for access-type: ${JSON.stringify(accessType)}`);
+        accessType = undefined;
+    }
     return {
         apiKey,
         dirs,

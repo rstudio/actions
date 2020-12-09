@@ -21,7 +21,7 @@ function bold (txt: string, color?: style.CSPair): string {
 }
 
 export interface ActionArgs {
-  accessType: string
+  accessType?: string
   apiKey: string
   dirs: string[]
   force: boolean
@@ -104,7 +104,7 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
 async function publishFromDirs (
   client: rsconnect.APIClient,
   dirs: string[],
-  force?: boolean,
+  force: boolean,
   accessType?: string
 ): Promise<ConnectPublishResult[]> {
   const ret: ConnectPublishResult[] = []
@@ -119,7 +119,7 @@ async function publishFromDir (
   client: rsconnect.APIClient,
   deployer: rsconnect.Deployer,
   dir: string,
-  force?: boolean,
+  force: boolean,
   accessType?: string
 ): Promise<ConnectPublishResult> {
   let dirName = dir
@@ -238,7 +238,14 @@ export function loadArgs (): ActionArgs {
   }
 
   const force = ['true', 'yes', 'ok', 'on'].includes(core.getInput('force').toLowerCase().trim())
-  const accessType = core.getInput('access-type').toLowerCase().trim()
+
+  let accessType: string | undefined = core.getInput('access-type').toLowerCase().trim()
+  if (accessType === '') {
+    accessType = undefined
+  } else if (!['all', 'logged_in', 'acl'].includes(accessType)) {
+    core.warning(`ignoring invalid value for access-type: ${JSON.stringify(accessType)}`)
+    accessType = undefined
+  }
 
   return {
     apiKey,
