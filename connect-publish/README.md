@@ -11,11 +11,13 @@ This action may be use for publishing to RStudio Connect.
 
 ## Inputs
 
-### `api-key`
+### `url`
 
-An [API key genereted in RStudio
-Connect](https://docs.rstudio.com/connect/__unreleased__/user/api-keys/).
-This value may be included in `url` as the "user" or "password"
+**Required** RStudio Connect URL of the instance to which content
+will be published. The value of the URL may contain an [API key
+genereted in RStudio
+Connect](https://docs.rstudio.com/connect/__unreleased__/user/api-keys/)
+(equivalent to the `api-key` input) in the "user" or "password"
 part.
 
 ### `dir`
@@ -26,14 +28,33 @@ Without a `:<vanity-URL>` suffix, the value of the directory path
 will be used to match any existing published content. Default `"."`
 (current directory).
 
-### `url`
+### `api-key`
 
-**Required** RStudio Connect URL of the instance to which content
-will be published. The value of the URL may contain an [API key
-genereted in RStudio
-Connect](https://docs.rstudio.com/connect/__unreleased__/user/api-keys/)
-(equivalent to the `api-key` input) in the "user" or "password"
+An [API key genereted in RStudio
+Connect](https://docs.rstudio.com/connect/__unreleased__/user/api-keys/).
+This value may be included in `url` as the "user" or "password"
 part.
+
+### `access-type`
+
+Access type to apply to published content. Valid values are:
+
+- `all`  publicly accessible
+- `logged_in` accessible only when logged into RStudio Connect
+- `acl` accessible to specific users and groups (managed within RStudio Connect)
+
+When not specified, the RStudio Connect server configuration
+default applies. Access types disallowed by RStudio Connect server
+configuration will result in the publish being canceled.
+
+### `force`
+
+Force publish even if up to date.
+
+> **NOTE**: The determination of a given publish being up to date
+> is based on the bundle generated from the manifest matching the
+> current bundle according to RStudio Connect. If available, the
+> bundle SHA1 digest is compared, else the bundle size is compared.
 
 ## Outputs
 
@@ -53,6 +74,7 @@ steps:
     uses: rstudio/actions/connect-publish@main
     with:
       url: https://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@connect.example.org
+      access-type: logged_in
       dir: |
         ./very-shiny-app/:/shiny/app/path/
         ./useful-rmarkdown-report/:/reports/useful/

@@ -6,16 +6,34 @@ import style from 'ansi-styles'
 
 import * as rsconnect from '@rstudio/rsconnect-ts'
 
+function bold (txt: string, color?: style.CSPair): string {
+  const c = (
+    color !== null && color !== undefined
+      ? color
+      : style.white
+  )
+  return [
+    c.open,
+    style.modifier.bold.open,
+    txt,
+    style.reset.close
+  ].join('')
+}
+
 export interface ActionArgs {
+  accessType: string
   apiKey: string
   dirs: string[]
+  force: boolean
   url: string
 }
+
+export type Success = boolean | 'SKIP'
 
 export interface ConnectPublishResult {
   dir: string
   url: string
-  success: boolean
+  success: Success
 }
 
 export class ConnectPublishErrorResult extends Error {
@@ -34,20 +52,35 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
   const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL })
   await client.serverSettings()
 
-  return await publishFromDirs(client, args.dirs)
+  return await publishFromDirs(client, args.dirs, args.force, args.accessType)
     .then((results: ConnectPublishResult[]) => {
-      core.info(`\n${style.blue.open}${style.modifier.bold.open}connect-publish results:${style.reset.close}`)
+      core.info(`\n${bold('connect-publish results', style.blue)}${bold(':')}`)
       results.forEach((res: ConnectPublishResult) => {
-        const successColor = res.success ? style.green : style.red
-        const successChar = res.success ? '✔' : '✘'
+        let successColor: style.CSPair
+        let successChar: string
+        switch (res.success) {
+          case true:
+            successColor = style.green
+            successChar = '✔'
+            break
+          case 'SKIP':
+            successColor = style.yellow
+            successChar = 'SKIP'
+            break
+          default:
+            successColor = style.red
+            successChar = '✘'
+            break
+        }
+
         core.info('  ' + ([
-          `   dir: ${style.white.open}${style.modifier.bold.open}${res.dir}${style.reset.close}`,
-          `   url: ${style.white.open}${style.modifier.bold.open}${res.url}${style.reset.close}`,
-          `status: ${successColor.open}${style.modifier.bold.open}${successChar}${style.reset.close}`
+          `   dir: ${bold(res.dir)}`,
+          `   url: ${bold(res.url)}`,
+          `status: ${bold(successChar, successColor)}`
         ].join('\n  ') + '\n'))
       })
 
-      const failed = results.filter((res: ConnectPublishResult) => !res.success)
+      const failed = results.filter((res: ConnectPublishResult) => res.success === false)
       if (failed.length > 0) {
         const failedDirs = failed.map((res: ConnectPublishResult) => res.dir)
         throw new ConnectPublishErrorResult(
@@ -68,23 +101,39 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
     })
 }
 
-async function publishFromDirs (client: rsconnect.APIClient, dirs: string[]): Promise<ConnectPublishResult[]> {
+async function publishFromDirs (
+  client: rsconnect.APIClient,
+  dirs: string[],
+  force?: boolean,
+  accessType?: string
+): Promise<ConnectPublishResult[]> {
   const ret: ConnectPublishResult[] = []
   const deployer = new rsconnect.Deployer(client)
   for (const dir of dirs) {
-    ret.push(await publishFromDir(client, deployer, dir))
+    ret.push(await publishFromDir(client, deployer, dir, force, accessType))
   }
   return ret
 }
 
-async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.Deployer, dir: string): Promise<ConnectPublishResult> {
+async function publishFromDir (
+  client: rsconnect.APIClient,
+  deployer: rsconnect.Deployer,
+  dir: string,
+  force?: boolean,
+  accessType?: string
+): Promise<ConnectPublishResult> {
   let dirName = dir
   let appPath: string | undefined
 
   if (dir.match(/[^:]+:[^:]+/) !== null) {
     const parts = dir.split(/:/)
     if (parts.length !== 2) {
-      core.warning(`discarding trailing value ${JSON.stringify(parts.slice(2).join(':'))} from dir ${JSON.stringify(dir)}`)
+      core.warning([
+        'discarding trailing value',
+        JSON.stringify(parts.slice(2).join(':')),
+        'from dir',
+        JSON.stringify(dir)
+      ].join(' '))
     }
     dirName = parts[0]
     appPath = parts[1]
@@ -95,25 +144,46 @@ async function publishFromDir (client: rsconnect.APIClient, deployer: rsconnect.
     core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`)
   }
 
-  core.debug(`publishing dir=${JSON.stringify(dirName)} path=${JSON.stringify(appPath)}`)
-  return await deployer.deployManifest(path.join(dirName, 'manifest.json'), appPath)
-    .then((resp: rsconnect.DeployTaskResponse) => {
-      core.info([
-        `publishing ${style.white.open}${style.modifier.bold.open}${dirName}${style.reset.close} to ${style.white.open}${style.modifier.bold.open}${resp.appUrl}${style.reset.close}`,
-        `     id: ${style.white.open}${style.modifier.bold.open}${resp.appId}${style.reset.close}`,
-        `   guid: ${style.white.open}${style.modifier.bold.open}${resp.appGuid}${style.reset.close}`,
-        `  title: ${style.white.open}${style.modifier.bold.open}${resp.title}${style.reset.close}`
-      ].join('\n'))
-      return {
-        resp,
-        poller: new rsconnect.ClientTaskPoller(client, resp.taskId)
-      }
-    })
+  core.debug([
+    'publishing',
+    `dir=${JSON.stringify(dirName)}`,
+    `path=${JSON.stringify(appPath)}`,
+    `force=${JSON.stringify(force)}`,
+    `accessType=${JSON.stringify(accessType)}`
+  ].join(' '))
+
+  return await deployer.deployManifest(
+    path.join(dirName, 'manifest.json'),
+    appPath,
+    force,
+    accessType
+  ).then((resp: rsconnect.DeployTaskResponse): {
+    resp: rsconnect.DeployTaskResponse
+    poller: rsconnect.ClientTaskPoller
+  } => {
+    let publishing = 'publishing'
+    let why = ''
+    if (resp.noOp) {
+      publishing = bold('skipping publishing', style.yellow)
+      why = ' (up to date)'
+    }
+    core.info([
+      `${publishing} ${bold(dirName)} to ${bold(resp.appUrl)}${why}`,
+      `     id: ${bold(resp.appId.toString())}`,
+      `   guid: ${bold(resp.appGuid)}`,
+      `  title: ${bold(resp.title)}`
+    ].join('\n'))
+
+    return {
+      resp,
+      poller: new rsconnect.ClientTaskPoller(client, resp.taskId)
+    }
+  })
     .then(async ({ resp, poller }: {
       resp: rsconnect.DeployTaskResponse
       poller: rsconnect.ClientTaskPoller
     }): Promise<ConnectPublishResult> => {
-      let success = true
+      let success: Success = resp.noOp ? 'SKIP' : true
       for await (const result of poller.poll()) {
         core.debug(`received poll result: ${JSON.stringify(result)}`)
         for (const line of result.status) {
@@ -167,9 +237,14 @@ export function loadArgs (): ActionArgs {
     dirs.push('.')
   }
 
+  const force = ['true', 'yes', 'ok', 'on'].includes(core.getInput('force').toLowerCase().trim())
+  const accessType = core.getInput('access-type').toLowerCase().trim()
+
   return {
     apiKey,
     dirs,
-    url: url.toString()
+    url: url.toString(),
+    force,
+    accessType
   }
 }
