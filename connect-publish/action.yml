@@ -12,6 +12,8 @@ inputs:
   force:
     description: Force publish even if up to date
     default: false
+  namespace:
+    description: Namespace prefix for published paths
   show-logs:
     description: Show all publishing logs
     default: false
