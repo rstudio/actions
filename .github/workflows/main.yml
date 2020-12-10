@@ -74,6 +74,7 @@ jobs:
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
           access-type: logged_in
+          show-logs: true
           force: true
           dir: |
             connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
