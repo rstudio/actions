@@ -25,16 +25,18 @@ export interface ActionArgs {
   apiKey: string
   dirs: string[]
   force: boolean
+  ns?: string
   showLogs: boolean
   url: string
 }
 
 interface publishArgs {
+  accessType?: string
   client: rsconnect.APIClient
   dirs: string[]
   force: boolean
+  ns?: string
   showLogs: boolean
-  accessType?: string
 }
 
 interface deployPollingResult {
@@ -67,9 +69,9 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
   const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL })
   await client.serverSettings()
 
-  const { dirs, force, showLogs, accessType } = args
+  const { accessType, dirs, force, ns, showLogs } = args
 
-  return await publishFromDirs({ client, dirs, force, showLogs, accessType })
+  return await publishFromDirs({ accessType, client, dirs, force, ns, showLogs })
     .then((results: ConnectPublishResult[]) => {
       core.info(`\n${bold('connect-publish results', style.blue)}${bold(':')}`)
       results.forEach((res: ConnectPublishResult) => {
@@ -118,12 +120,12 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
     })
 }
 
-async function publishFromDirs ({ client, dirs, showLogs, force, accessType }: publishArgs): Promise<ConnectPublishResult[]> {
+async function publishFromDirs ({ accessType, client, dirs, force, ns, showLogs }: publishArgs): Promise<ConnectPublishResult[]> {
   const ret: ConnectPublishResult[] = []
   const deployer = new rsconnect.Deployer(client)
   for (const dir of dirs) {
     ret.push(await publishFromDir(deployer, dir, {
-      client, showLogs, force, accessType, dirs: []
+      accessType, client, dirs: [], force, ns, showLogs
     }))
   }
   return ret
@@ -132,7 +134,7 @@ async function publishFromDirs ({ client, dirs, showLogs, force, accessType }: p
 async function publishFromDir (
   deployer: rsconnect.Deployer,
   dir: string,
-  { client, showLogs, force, accessType }: publishArgs
+  { accessType, client, force, ns, showLogs }: publishArgs
 ): Promise<ConnectPublishResult> {
   let dirName = dir
   let appPath: string | undefined
@@ -154,6 +156,17 @@ async function publishFromDir (
   if (appPath === undefined) {
     appPath = rsconnect.ApplicationPather.strictAppPath(dirName)
     core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`)
+  }
+
+  if (ns !== undefined) {
+    core.debug([
+      'prefixing',
+      `path=${JSON.stringify(appPath)}`,
+      'with',
+      `namespace=${JSON.stringify(ns)}`
+    ].join(' '))
+
+    appPath = rsconnect.ApplicationPather.strictAppPath([ns, appPath].join('/'))
   }
 
   core.debug([
@@ -257,11 +270,17 @@ export function loadArgs (): ActionArgs {
     accessType = undefined
   }
 
+  let ns: string | undefined = core.getInput('namespace').toLowerCase().trim()
+  if (ns === '') {
+    ns = undefined
+  }
+
   return {
     apiKey,
     dirs,
     url: url.toString(),
     force,
+    ns,
     showLogs,
     accessType
   }

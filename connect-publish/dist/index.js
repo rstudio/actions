@@ -34283,8 +34283,8 @@ async function connectPublish(args) {
     core.debug(`using base URL ${baseURL}`);
     const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL });
     await client.serverSettings();
-    const { dirs, force, showLogs, accessType } = args;
-    return await publishFromDirs({ client, dirs, force, showLogs, accessType })
+    const { accessType, dirs, force, ns, showLogs } = args;
+    return await publishFromDirs({ accessType, client, dirs, force, ns, showLogs })
         .then((results) => {
         core.info(`\n${bold('connect-publish results', ansi_styles_1.default.blue)}${bold(':')}`);
         results.forEach((res) => {
@@ -34328,17 +34328,17 @@ async function connectPublish(args) {
     });
 }
 exports.connectPublish = connectPublish;
-async function publishFromDirs({ client, dirs, showLogs, force, accessType }) {
+async function publishFromDirs({ accessType, client, dirs, force, ns, showLogs }) {
     const ret = [];
     const deployer = new rsconnect.Deployer(client);
     for (const dir of dirs) {
         ret.push(await publishFromDir(deployer, dir, {
-            client, showLogs, force, accessType, dirs: []
+            accessType, client, dirs: [], force, ns, showLogs
         }));
     }
     return ret;
 }
-async function publishFromDir(deployer, dir, { client, showLogs, force, accessType }) {
+async function publishFromDir(deployer, dir, { accessType, client, force, ns, showLogs }) {
     let dirName = dir;
     let appPath;
     if (dir.match(/[^:]+:[^:]+/) !== null) {
@@ -34357,6 +34357,15 @@ async function publishFromDir(deployer, dir, { client, showLogs, force, accessTy
     if (appPath === undefined) {
         appPath = rsconnect.ApplicationPather.strictAppPath(dirName);
         core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`);
+    }
+    if (ns !== undefined) {
+        core.debug([
+            'prefixing',
+            `path=${JSON.stringify(appPath)}`,
+            'with',
+            `namespace=${JSON.stringify(ns)}`
+        ].join(' '));
+        appPath = rsconnect.ApplicationPather.strictAppPath([ns, appPath].join('/'));
     }
     core.debug([
         'publishing',
@@ -34448,11 +34457,16 @@ function loadArgs() {
         core.warning(`ignoring invalid value for access-type: ${JSON.stringify(accessType)}`);
         accessType = undefined;
     }
+    let ns = core.getInput('namespace').toLowerCase().trim();
+    if (ns === '') {
+        ns = undefined;
+    }
     return {
         apiKey,
         dirs,
         url: url.toString(),
         force,
+        ns,
         showLogs,
         accessType
     };

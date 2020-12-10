@@ -29,6 +29,7 @@ describe("connectPublish", () => {
     },
     {
       dir: 'testapps/flask',
+      ns: 'sneaky',
       expectError: false
     },
     {
@@ -40,6 +41,9 @@ describe("connectPublish", () => {
   testCases.forEach((tc: any) => {
     it(`publishes ${tc.dir} to connect`, async () => {
       process.env["INPUT_DIR"] = tc.dir
+      if (tc.ns !== undefined) {
+        process.env["INPUT_NAMESPACE"] = tc.ns
+      }
       const results = await connectPublish(loadArgs())
         .catch((err: any) => {
           if (tc.expectError) {

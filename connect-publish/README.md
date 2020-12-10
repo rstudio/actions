@@ -49,6 +49,32 @@ When not specified, the RStudio Connect server configuration
 default applies. Access types disallowed by RStudio Connect server
 configuration will result in the publish being canceled.
 
+### `namespace`
+
+Namespace prefix for published paths. (No default)
+
+This value is used in the construction of the "vanity URL" path,
+e.g. this configuration:
+
+```yaml
+  - uses: rstudio/actions/connect-publish@main
+    with:
+      url: https://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@connect.example.org
+      namespace: experimental-beta
+      dir: ./very-shiny-app/:/shiny/app/path/
+```
+
+will result in a published URL of
+
+```
+https://connect.example.org/experimental-beta/shiny/app/path/
+```
+
+> **NOTE** Because the namespace is used as the first segment of a
+> slash-delimited path, there are restrictions on what is allowed
+> by RStudio Connect. For example, a namespace of `connect` is not
+> allowed and will result in an error at publish time.
+
 ### `show-logs`
 
 Show all publishing logs. (Default `false`)
