@@ -26,6 +26,7 @@ export interface ActionArgs {
   dirs: string[]
   force: boolean
   ns?: string
+  requireVanityPath: boolean
   showLogs: boolean
   url: string
 }
@@ -35,6 +36,7 @@ interface publishArgs {
   client: rsconnect.APIClient
   dirs: string[]
   force: boolean
+  requireVanityPath: boolean
   ns?: string
   showLogs: boolean
 }
@@ -69,9 +71,11 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
   const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL })
   await client.serverSettings()
 
-  const { accessType, dirs, force, ns, showLogs } = args
+  const { accessType, dirs, force, ns, requireVanityPath, showLogs } = args
 
-  return await publishFromDirs({ accessType, client, dirs, force, ns, showLogs })
+  return await publishFromDirs({
+    accessType, client, dirs, force, ns, requireVanityPath, showLogs
+  })
     .then((results: ConnectPublishResult[]) => {
       core.info(`\n${bold('connect-publish results', style.blue)}${bold(':')}`)
       results.forEach((res: ConnectPublishResult) => {
@@ -120,12 +124,12 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
     })
 }
 
-async function publishFromDirs ({ accessType, client, dirs, force, ns, showLogs }: publishArgs): Promise<ConnectPublishResult[]> {
+async function publishFromDirs ({ accessType, client, dirs, force, ns, requireVanityPath, showLogs }: publishArgs): Promise<ConnectPublishResult[]> {
   const ret: ConnectPublishResult[] = []
   const deployer = new rsconnect.Deployer(client)
   for (const dir of dirs) {
     ret.push(await publishFromDir(deployer, dir, {
-      accessType, client, dirs: [], force, ns, showLogs
+      accessType, client, dirs: [], force, ns, requireVanityPath, showLogs
     }))
   }
   return ret
@@ -134,10 +138,10 @@ async function publishFromDirs ({ accessType, client, dirs, force, ns, showLogs 
 async function publishFromDir (
   deployer: rsconnect.Deployer,
   dir: string,
-  { accessType, client, force, ns, showLogs }: publishArgs
+  { accessType, client, force, ns, requireVanityPath, showLogs }: publishArgs
 ): Promise<ConnectPublishResult> {
   let dirName = dir
-  let appPath: string | undefined
+  let appIdentifier: string | undefined
 
   if (dir.match(/[^:]+:[^:]+/) !== null) {
     const parts = dir.split(/:/)
@@ -150,39 +154,40 @@ async function publishFromDir (
       ].join(' '))
     }
     dirName = parts[0]
-    appPath = parts[1]
+    appIdentifier = parts[1]
   }
 
-  if (appPath === undefined) {
-    appPath = rsconnect.ApplicationPather.strictAppPath(dirName)
-    core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`)
+  if (appIdentifier === undefined) {
+    appIdentifier = rsconnect.ApplicationPather.strictAppPath(dirName)
+    core.debug(`strict path=${JSON.stringify(appIdentifier)} derived from dir=${JSON.stringify(dirName)}`)
   }
 
   if (ns !== undefined) {
     core.debug([
       'prefixing',
-      `path=${JSON.stringify(appPath)}`,
+      `path=${JSON.stringify(appIdentifier)}`,
       'with',
       `namespace=${JSON.stringify(ns)}`
     ].join(' '))
 
-    appPath = rsconnect.ApplicationPather.strictAppPath([ns, appPath].join('/'))
+    appIdentifier = rsconnect.ApplicationPather.strictAppPath([ns, appIdentifier].join('/'))
   }
 
   core.debug([
     'publishing',
     `dir=${JSON.stringify(dirName)}`,
-    `path=${JSON.stringify(appPath)}`,
+    `path=${JSON.stringify(appIdentifier)}`,
     `force=${JSON.stringify(force)}`,
     `accessType=${JSON.stringify(accessType)}`
   ].join(' '))
 
-  return await deployer.deployManifest(
-    path.join(dirName, 'manifest.json'),
-    appPath,
+  return await deployer.deployManifest({
+    accessType,
+    appIdentifier,
     force,
-    accessType
-  ).then((resp: rsconnect.DeployTaskResponse): deployPollingResult => {
+    manifestPath: path.join(dirName, 'manifest.json'),
+    requireVanityPath
+  }).then((resp: rsconnect.DeployTaskResponse): deployPollingResult => {
     let publishing = 'publishing'
     let why = ''
     if (resp.noOp) {
@@ -192,6 +197,7 @@ async function publishFromDir (
     core.info([
       `${publishing} ${bold(dirName)} to ${bold(resp.appUrl)}${why}`,
       `     id: ${bold(resp.appId.toString())}`,
+      `   name: ${bold(resp.appName.toString())}`,
       `   guid: ${bold(resp.appGuid)}`,
       `  title: ${bold(resp.title)}`
     ].join('\n'))
@@ -261,6 +267,7 @@ export function loadArgs (): ActionArgs {
 
   const force = asBool(core.getInput('force'))
   const showLogs = asBool(core.getInput('show-logs'))
+  const requireVanityPath = asBool(core.getInput('require-vanity-path'))
 
   let accessType: string | undefined = core.getInput('access-type').toLowerCase().trim()
   if (accessType === '') {
@@ -276,13 +283,14 @@ export function loadArgs (): ActionArgs {
   }
 
   return {
+    accessType,
     apiKey,
     dirs,
-    url: url.toString(),
     force,
     ns,
+    requireVanityPath,
     showLogs,
-    accessType
+    url: url.toString()
   }
 }
 

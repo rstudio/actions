@@ -407,6 +407,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.APIClient = void 0;
 const axios_1 = __importDefault(__webpack_require__(6545));
 const fs_1 = __importDefault(__webpack_require__(5747));
+const qs_1 = __importDefault(__webpack_require__(2760));
 const debugLog_1 = __webpack_require__(3802);
 const conversions_1 = __webpack_require__(7936);
 class APIClient {
@@ -416,6 +417,12 @@ class APIClient {
             baseURL: this.cfg.baseURL,
             headers: {
                 Authorization: `Key ${this.cfg.apiKey}`
+            },
+            paramsSerializer: (params) => {
+                return qs_1.default.stringify(params, {
+                    arrayFormat: 'repeat',
+                    encode: false
+                });
             }
         });
         if (debugLog_1.debugEnabled) {
@@ -774,75 +781,65 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Deployer = void 0;
 const crypto_1 = __importDefault(__webpack_require__(6417));
-const url_1 = __webpack_require__(8835);
-const conversions_1 = __webpack_require__(7936);
 const debugLog_1 = __webpack_require__(3802);
 const Bundler_1 = __webpack_require__(5758);
-const ListApplicationsPager_1 = __webpack_require__(2471);
 const ApplicationPather_1 = __webpack_require__(1240);
+const APIErrorDuplicateName = 26;
 class Deployer {
     constructor(client) {
         this.client = client;
         this.bundler = new Bundler_1.Bundler();
         this.pather = new ApplicationPather_1.ApplicationPather();
     }
-    async deployManifest(manifestPath, appPath, force, accessType) {
-        return await this.deployBundle(await this.bundler.fromManifest(manifestPath), appPath, force, accessType);
+    async deployManifest({ accessType, appIdentifier, force, manifestPath, requireVanityPath }) {
+        return await this.deployBundle({
+            accessType,
+            appIdentifier,
+            bundle: await this.bundler.fromManifest(manifestPath),
+            force,
+            requireVanityPath
+        });
     }
-    async deployBundle(bundle, appPath, force, accessType) {
+    async deployBundle({ accessType, appIdentifier, bundle, force, requireVanityPath }) {
         var _a;
-        const resolvedAppPath = this.pather.resolve(bundle.manifestPath, appPath);
+        const resolvedAppPath = this.pather.resolve(bundle.manifestPath, appIdentifier);
+        const resolvedAppName = this.makeDeploymentName(appIdentifier, resolvedAppPath);
         debugLog_1.debugLog(() => [
-            'Deployer: initial app path resolution',
-            `resolved=${JSON.stringify(resolvedAppPath)}`,
-            `orig=${JSON.stringify(appPath)}`
+            'Deployer: initial app resolution',
+            `resolvedAppPath=${JSON.stringify(resolvedAppPath)}`,
+            `resolvedAppName=${JSON.stringify(resolvedAppName)}`,
+            `appIdentifier=${JSON.stringify(appIdentifier)}`
         ].join(' '));
-        let appID = null;
-        let app = null;
-        let reassignTitle = false;
+        const reassignTitle = false;
         let existingBundleSize = null;
         let existingBundleSha1 = null;
-        if (resolvedAppPath !== '') {
-            // TODO: use an API that doesn't require scanning all applications, if possible
-            const existingApp = await this.findExistingApp(resolvedAppPath);
-            if (existingApp !== null) {
+        const app = await this.findOrCreateByName(resolvedAppName);
+        if (app.bundleId !== null && app.bundleId !== undefined) {
+            const existingBundle = await this.client.getBundle(app.bundleId);
+            if (existingBundle.size !== null && existingBundle.size !== undefined) {
+                existingBundleSize = existingBundle.size;
+            }
+            else {
                 debugLog_1.debugLog(() => [
-                    'Deployer: found existing',
-                    `app=${JSON.stringify(existingApp.id)}`,
-                    'at',
-                    `path=${JSON.stringify(resolvedAppPath)}`
+                    'Deployer: existing app',
+                    `bundle=${JSON.stringify(app.bundleId)}`,
+                    'missing size'
                 ].join(' '));
-                app = existingApp;
-                appID = existingApp.id;
-                if (existingApp.bundleId !== null && existingApp.bundleId !== undefined) {
-                    const existingBundle = await this.client.getBundle(existingApp.bundleId);
-                    if (existingBundle.size !== null && existingBundle.size !== undefined) {
-                        existingBundleSize = existingBundle.size;
-                    }
-                    else {
-                        debugLog_1.debugLog(() => [
-                            'Deployer: existing app',
-                            `bundle=${JSON.stringify(existingApp.bundleId)}`,
-                            'missing size'
-                        ].join(' '));
-                    }
-                    if (existingBundle.metadata !== null && existingBundle.metadata !== undefined) {
-                        existingBundleSha1 = existingBundle.metadata.sha1;
-                    }
-                    else {
-                        debugLog_1.debugLog(() => [
-                            'Deployer: existing app',
-                            `bundle=${JSON.stringify(existingApp.bundleId)}`,
-                            'missing sha1'
-                        ].join(' '));
-                    }
-                }
+            }
+            if (existingBundle.metadata !== null && existingBundle.metadata !== undefined) {
+                existingBundleSha1 = existingBundle.metadata.BundleArchiveSHA1;
+            }
+            else {
+                debugLog_1.debugLog(() => [
+                    'Deployer: existing app',
+                    `bundle=${JSON.stringify(app.bundleId)}`,
+                    'missing sha1'
+                ].join(' '));
             }
         }
         const bundleSize = bundle.size();
         const bundleSha1 = bundle.sha1();
-        if (app !== null &&
-            this.bundleMatchesCurrent(bundleSize, bundleSha1, existingBundleSize, existingBundleSha1) &&
+        if (this.bundleMatchesCurrent(bundleSize, bundleSha1, existingBundleSize, existingBundleSha1) &&
             force !== true) {
             debugLog_1.debugLog(() => [
                 'Deployer: local bundle',
@@ -855,54 +852,42 @@ class Deployer {
                 'so returning no-op deploy result'
             ].join(' '));
             return {
-                taskId: '',
-                appId: app.id,
                 appGuid: app.guid,
+                appId: app.id,
+                appName: app.name,
                 appUrl: app.url,
+                noOp: true,
+                taskId: '',
                 title: (app.title !== undefined && app.title !== null
                     ? app.title
-                    : ''),
-                noOp: true
+                    : '')
             };
-        }
-        const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
-        if (appID === null) {
-            const appName = this.makeDeploymentName(manifestTitle, resolvedAppPath);
-            debugLog_1.debugLog(() => [
-                'Deployer: creating new app with',
-                `name=${JSON.stringify(appName)}`,
-                'from',
-                `title=${JSON.stringify(manifestTitle)},`,
-                `path=${JSON.stringify(resolvedAppPath)}}`
-            ].join(' '));
-            app = await this.client.createApp(appName);
-            debugLog_1.debugLog(() => [
-                'Deployer: new app created with',
-                `id=${JSON.stringify(app === null || app === void 0 ? void 0 : app.id)}`
-            ].join(' '));
-            appID = app.id;
-            reassignTitle = true;
-        }
-        else {
-            debugLog_1.debugLog(() => [
-                'Deployer: getting existing app with',
-                `id=${JSON.stringify(appID)}`
-            ].join(' '));
-            app = await this.client.getApp(appID);
-        }
-        if (app == null) {
-            return await Promise.reject(new Error('unable to find or create app'));
         }
         if (!app.vanityUrl && resolvedAppPath !== '') {
             debugLog_1.debugLog(() => [
-                'Deployer: updating vanity URL for',
-                `app=${JSON.stringify(appID)}`,
+                'Deployer: attempting to update vanity URL for',
+                `app=${JSON.stringify(app.id)}`,
                 'to',
                 `path=${JSON.stringify(resolvedAppPath)}`
             ].join(' '));
-            await this.client.updateAppVanityURL(appID, resolvedAppPath);
+            await this.client.updateAppVanityURL(app.id, resolvedAppPath)
+                .catch((err) => {
+                debugLog_1.debugLog(() => {
+                    var _a;
+                    return [
+                        'Deployer: failed to update vanity URL for',
+                        `app=${JSON.stringify(app.id)}`,
+                        `err=${JSON.stringify(err.message)}`,
+                        `data=${JSON.stringify((_a = err.response) === null || _a === void 0 ? void 0 : _a.data)}`
+                    ].join(' ');
+                });
+                if (requireVanityPath === true) {
+                    throw err;
+                }
+            });
         }
         const appUpdates = {};
+        const manifestTitle = (_a = bundle.manifest) === null || _a === void 0 ? void 0 : _a.title;
         if (manifestTitle !== undefined && manifestTitle !== null && reassignTitle) {
             app.title = manifestTitle;
             appUpdates.title = app.title;
@@ -914,34 +899,34 @@ class Deployer {
         if (Object.keys(appUpdates).length !== 0) {
             debugLog_1.debugLog(() => [
                 'Deployer: updating',
-                `app=${JSON.stringify(appID)}`,
+                `app=${JSON.stringify(app.id)}`,
                 `with=${JSON.stringify(appUpdates)}`
             ].join(' '));
-            await this.client.updateApp(appID, appUpdates);
+            await this.client.updateApp(app.id, appUpdates);
         }
         debugLog_1.debugLog(() => [
             'Deployer: uploading bundle for',
-            `app=${JSON.stringify(appID)}`,
+            `app=${JSON.stringify(app.id)}`,
             `tarball=${JSON.stringify(bundle.tarballPath)}`
         ].join(' '));
-        const uploadedBundle = await this.client.uploadApp(appID, bundle);
+        const uploadedBundle = await this.client.uploadApp(app.id, bundle);
         debugLog_1.debugLog(() => [
             'Deployer: deploying',
-            `app=${JSON.stringify(appID)}`,
+            `app=${JSON.stringify(app.id)}`,
             `bundle=${JSON.stringify(uploadedBundle.id)}`
         ].join(' '));
-        return await this.client.deployApp(appID, uploadedBundle.id)
+        return await this.client.deployApp(app.id, uploadedBundle.id)
             .then((ct) => {
-            const taskApp = app;
             return {
+                appGuid: app.guid,
+                appId: app.id,
+                appName: app.name,
+                appUrl: app.url,
+                noOp: false,
                 taskId: ct.id,
-                appId: taskApp.id,
-                appGuid: taskApp.guid,
-                appUrl: taskApp.url,
-                title: (taskApp.title !== undefined && taskApp.title !== null
-                    ? taskApp.title
-                    : ''),
-                noOp: false
+                title: (app.title !== undefined && app.title !== null
+                    ? app.title
+                    : '')
             };
         });
     }
@@ -949,35 +934,71 @@ class Deployer {
         return ((existingSize !== null && bundleSize === existingSize) ||
             (existingSha1 !== null && bundleSha1 === existingSha1));
     }
-    async findExistingApp(appPath) {
-        let found = null;
-        const matchingPath = conversions_1.pathInSlashes([
-            this.client.clientPathname,
-            appPath
-        ]);
-        const pager = new ListApplicationsPager_1.ListApplicationsPager(this.client);
-        for await (const app of pager.listApplications()) {
-            const currentAppPath = conversions_1.pathInSlashes([new url_1.URL(app.url).pathname]);
-            if (currentAppPath === matchingPath) {
-                found = app;
-                debugLog_1.debugLog(() => [
-                    'Deployer: found matching app at',
-                    `path=${JSON.stringify(currentAppPath)}`
-                ].join(' '));
-                break;
-            }
+    async findOrCreateByName(name) {
+        if (name.length === 36 && name.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/) !== null) {
             debugLog_1.debugLog(() => [
-                'Deployer: skipping mismatched',
-                `currentAppPath=${JSON.stringify(currentAppPath)}`,
-                'for search',
-                `appPath=${JSON.stringify(matchingPath)}`
+                'Deployer: treating',
+                `name=${JSON.stringify(name)}`,
+                'as a GUID'
             ].join(' '));
+            return await this.client.getApp(name);
         }
-        return found;
+        return await this.client.createApp(name)
+            .then((app) => app)
+            .catch(async (err) => {
+            var _a, _b, _c;
+            if (((_a = err.response) === null || _a === void 0 ? void 0 : _a.status) !== 409) {
+                debugLog_1.debugLog(() => {
+                    var _a;
+                    return [
+                        'Deployer: received an unexpected error response during app',
+                        'creation with',
+                        `name=${JSON.stringify(name)}`,
+                        `data=${JSON.stringify((_a = err.response) === null || _a === void 0 ? void 0 : _a.data)}`
+                    ].join(' ');
+                });
+                throw err;
+            }
+            const errCode = (_c = (_b = err.response) === null || _b === void 0 ? void 0 : _b.data) === null || _c === void 0 ? void 0 : _c.code;
+            if (errCode !== APIErrorDuplicateName) {
+                debugLog_1.debugLog(() => {
+                    var _a;
+                    return [
+                        'Deployer: received an unexpected conflict error during app',
+                        'creation with',
+                        `name=${JSON.stringify(name)}`,
+                        `data=${JSON.stringify((_a = err.response) === null || _a === void 0 ? void 0 : _a.data)}`
+                    ].join(' ');
+                });
+                throw err;
+            }
+            return this.findExistingAppByName(name);
+        });
     }
-    makeDeploymentName(title, appPath) {
+    async findExistingAppByName(name) {
+        return await this.client.listApplications({ count: 1, filter: [`name:${name}`] })
+            .then((resp) => {
+            if (resp.applications.length < 1) {
+                debugLog_1.debugLog(() => [
+                    'Deployer: failed to find application with',
+                    `name=${JSON.stringify(name)}`
+                ].join(' '));
+                throw new Error(`no application with name=${JSON.stringify(name)}`);
+            }
+            return resp.applications[0];
+        });
+    }
+    makeDeploymentName(appIdentifier, appPath) {
         let name = '';
-        if ((title === null || title === undefined) || (appPath === null || appPath === undefined)) {
+        if (appIdentifier !== null && appIdentifier !== undefined) {
+            if (!appIdentifier.includes('/') && appIdentifier.length > 2) {
+                return appIdentifier;
+            }
+            else if (appIdentifier.length < 3) {
+                name = appIdentifier;
+            }
+        }
+        else {
             name = 'unnamed ' + crypto_1.default.randomBytes(15).toString('base64');
         }
         if (appPath !== null && appPath !== undefined) {
@@ -28525,6 +28546,859 @@ module.exports.win32 = win32;
 
 /***/ }),
 
+/***/ 4907:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+var replace = String.prototype.replace;
+var percentTwenties = /%20/g;
+
+var util = __webpack_require__(2360);
+
+var Format = {
+    RFC1738: 'RFC1738',
+    RFC3986: 'RFC3986'
+};
+
+module.exports = util.assign(
+    {
+        'default': Format.RFC3986,
+        formatters: {
+            RFC1738: function (value) {
+                return replace.call(value, percentTwenties, '+');
+            },
+            RFC3986: function (value) {
+                return String(value);
+            }
+        }
+    },
+    Format
+);
+
+
+/***/ }),
+
+/***/ 2760:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+var stringify = __webpack_require__(9954);
+var parse = __webpack_require__(3912);
+var formats = __webpack_require__(4907);
+
+module.exports = {
+    formats: formats,
+    parse: parse,
+    stringify: stringify
+};
+
+
+/***/ }),
+
+/***/ 3912:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+var utils = __webpack_require__(2360);
+
+var has = Object.prototype.hasOwnProperty;
+var isArray = Array.isArray;
+
+var defaults = {
+    allowDots: false,
+    allowPrototypes: false,
+    arrayLimit: 20,
+    charset: 'utf-8',
+    charsetSentinel: false,
+    comma: false,
+    decoder: utils.decode,
+    delimiter: '&',
+    depth: 5,
+    ignoreQueryPrefix: false,
+    interpretNumericEntities: false,
+    parameterLimit: 1000,
+    parseArrays: true,
+    plainObjects: false,
+    strictNullHandling: false
+};
+
+var interpretNumericEntities = function (str) {
+    return str.replace(/&#(\d+);/g, function ($0, numberStr) {
+        return String.fromCharCode(parseInt(numberStr, 10));
+    });
+};
+
+var parseArrayValue = function (val, options) {
+    if (val && typeof val === 'string' && options.comma && val.indexOf(',') > -1) {
+        return val.split(',');
+    }
+
+    return val;
+};
+
+// This is what browsers will submit when the ✓ character occurs in an
+// application/x-www-form-urlencoded body and the encoding of the page containing
+// the form is iso-8859-1, or when the submitted form has an accept-charset
+// attribute of iso-8859-1. Presumably also with other charsets that do not contain
+// the ✓ character, such as us-ascii.
+var isoSentinel = 'utf8=%26%2310003%3B'; // encodeURIComponent('&#10003;')
+
+// These are the percent-encoded utf-8 octets representing a checkmark, indicating that the request actually is utf-8 encoded.
+var charsetSentinel = 'utf8=%E2%9C%93'; // encodeURIComponent('✓')
+
+var parseValues = function parseQueryStringValues(str, options) {
+    var obj = {};
+    var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, '') : str;
+    var limit = options.parameterLimit === Infinity ? undefined : options.parameterLimit;
+    var parts = cleanStr.split(options.delimiter, limit);
+    var skipIndex = -1; // Keep track of where the utf8 sentinel was found
+    var i;
+
+    var charset = options.charset;
+    if (options.charsetSentinel) {
+        for (i = 0; i < parts.length; ++i) {
+            if (parts[i].indexOf('utf8=') === 0) {
+                if (parts[i] === charsetSentinel) {
+                    charset = 'utf-8';
+                } else if (parts[i] === isoSentinel) {
+                    charset = 'iso-8859-1';
+                }
+                skipIndex = i;
+                i = parts.length; // The eslint settings do not allow break;
+            }
+        }
+    }
+
+    for (i = 0; i < parts.length; ++i) {
+        if (i === skipIndex) {
+            continue;
+        }
+        var part = parts[i];
+
+        var bracketEqualsPos = part.indexOf(']=');
+        var pos = bracketEqualsPos === -1 ? part.indexOf('=') : bracketEqualsPos + 1;
+
+        var key, val;
+        if (pos === -1) {
+            key = options.decoder(part, defaults.decoder, charset, 'key');
+            val = options.strictNullHandling ? null : '';
+        } else {
+            key = options.decoder(part.slice(0, pos), defaults.decoder, charset, 'key');
+            val = utils.maybeMap(
+                parseArrayValue(part.slice(pos + 1), options),
+                function (encodedVal) {
+                    return options.decoder(encodedVal, defaults.decoder, charset, 'value');
+                }
+            );
+        }
+
+        if (val && options.interpretNumericEntities && charset === 'iso-8859-1') {
+            val = interpretNumericEntities(val);
+        }
+
+        if (part.indexOf('[]=') > -1) {
+            val = isArray(val) ? [val] : val;
+        }
+
+        if (has.call(obj, key)) {
+            obj[key] = utils.combine(obj[key], val);
+        } else {
+            obj[key] = val;
+        }
+    }
+
+    return obj;
+};
+
+var parseObject = function (chain, val, options, valuesParsed) {
+    var leaf = valuesParsed ? val : parseArrayValue(val, options);
+
+    for (var i = chain.length - 1; i >= 0; --i) {
+        var obj;
+        var root = chain[i];
+
+        if (root === '[]' && options.parseArrays) {
+            obj = [].concat(leaf);
+        } else {
+            obj = options.plainObjects ? Object.create(null) : {};
+            var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
+            var index = parseInt(cleanRoot, 10);
+            if (!options.parseArrays && cleanRoot === '') {
+                obj = { 0: leaf };
+            } else if (
+                !isNaN(index)
+                && root !== cleanRoot
+                && String(index) === cleanRoot
+                && index >= 0
+                && (options.parseArrays && index <= options.arrayLimit)
+            ) {
+                obj = [];
+                obj[index] = leaf;
+            } else {
+                obj[cleanRoot] = leaf;
+            }
+        }
+
+        leaf = obj; // eslint-disable-line no-param-reassign
+    }
+
+    return leaf;
+};
+
+var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
+    if (!givenKey) {
+        return;
+    }
+
+    // Transform dot notation to bracket notation
+    var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, '[$1]') : givenKey;
+
+    // The regex chunks
+
+    var brackets = /(\[[^[\]]*])/;
+    var child = /(\[[^[\]]*])/g;
+
+    // Get the parent
+
+    var segment = options.depth > 0 && brackets.exec(key);
+    var parent = segment ? key.slice(0, segment.index) : key;
+
+    // Stash the parent if it exists
+
+    var keys = [];
+    if (parent) {
+        // If we aren't using plain objects, optionally prefix keys that would overwrite object prototype properties
+        if (!options.plainObjects && has.call(Object.prototype, parent)) {
+            if (!options.allowPrototypes) {
+                return;
+            }
+        }
+
+        keys.push(parent);
+    }
+
+    // Loop through children appending to the array until we hit depth
+
+    var i = 0;
+    while (options.depth > 0 && (segment = child.exec(key)) !== null && i < options.depth) {
+        i += 1;
+        if (!options.plainObjects && has.call(Object.prototype, segment[1].slice(1, -1))) {
+            if (!options.allowPrototypes) {
+                return;
+            }
+        }
+        keys.push(segment[1]);
+    }
+
+    // If there's a remainder, just add whatever is left
+
+    if (segment) {
+        keys.push('[' + key.slice(segment.index) + ']');
+    }
+
+    return parseObject(keys, val, options, valuesParsed);
+};
+
+var normalizeParseOptions = function normalizeParseOptions(opts) {
+    if (!opts) {
+        return defaults;
+    }
+
+    if (opts.decoder !== null && opts.decoder !== undefined && typeof opts.decoder !== 'function') {
+        throw new TypeError('Decoder has to be a function.');
+    }
+
+    if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+        throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
+    }
+    var charset = typeof opts.charset === 'undefined' ? defaults.charset : opts.charset;
+
+    return {
+        allowDots: typeof opts.allowDots === 'undefined' ? defaults.allowDots : !!opts.allowDots,
+        allowPrototypes: typeof opts.allowPrototypes === 'boolean' ? opts.allowPrototypes : defaults.allowPrototypes,
+        arrayLimit: typeof opts.arrayLimit === 'number' ? opts.arrayLimit : defaults.arrayLimit,
+        charset: charset,
+        charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
+        comma: typeof opts.comma === 'boolean' ? opts.comma : defaults.comma,
+        decoder: typeof opts.decoder === 'function' ? opts.decoder : defaults.decoder,
+        delimiter: typeof opts.delimiter === 'string' || utils.isRegExp(opts.delimiter) ? opts.delimiter : defaults.delimiter,
+        // eslint-disable-next-line no-implicit-coercion, no-extra-parens
+        depth: (typeof opts.depth === 'number' || opts.depth === false) ? +opts.depth : defaults.depth,
+        ignoreQueryPrefix: opts.ignoreQueryPrefix === true,
+        interpretNumericEntities: typeof opts.interpretNumericEntities === 'boolean' ? opts.interpretNumericEntities : defaults.interpretNumericEntities,
+        parameterLimit: typeof opts.parameterLimit === 'number' ? opts.parameterLimit : defaults.parameterLimit,
+        parseArrays: opts.parseArrays !== false,
+        plainObjects: typeof opts.plainObjects === 'boolean' ? opts.plainObjects : defaults.plainObjects,
+        strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling
+    };
+};
+
+module.exports = function (str, opts) {
+    var options = normalizeParseOptions(opts);
+
+    if (str === '' || str === null || typeof str === 'undefined') {
+        return options.plainObjects ? Object.create(null) : {};
+    }
+
+    var tempObj = typeof str === 'string' ? parseValues(str, options) : str;
+    var obj = options.plainObjects ? Object.create(null) : {};
+
+    // Iterate over the keys and setup the new object
+
+    var keys = Object.keys(tempObj);
+    for (var i = 0; i < keys.length; ++i) {
+        var key = keys[i];
+        var newObj = parseKeys(key, tempObj[key], options, typeof str === 'string');
+        obj = utils.merge(obj, newObj, options);
+    }
+
+    return utils.compact(obj);
+};
+
+
+/***/ }),
+
+/***/ 9954:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+"use strict";
+
+
+var utils = __webpack_require__(2360);
+var formats = __webpack_require__(4907);
+var has = Object.prototype.hasOwnProperty;
+
+var arrayPrefixGenerators = {
+    brackets: function brackets(prefix) {
+        return prefix + '[]';
+    },
+    comma: 'comma',
+    indices: function indices(prefix, key) {
+        return prefix + '[' + key + ']';
+    },
+    repeat: function repeat(prefix) {
+        return prefix;
+    }
+};
+
+var isArray = Array.isArray;
+var push = Array.prototype.push;
+var pushToArray = function (arr, valueOrArray) {
+    push.apply(arr, isArray(valueOrArray) ? valueOrArray : [valueOrArray]);
+};
+
+var toISO = Date.prototype.toISOString;
+
+var defaultFormat = formats['default'];
+var defaults = {
+    addQueryPrefix: false,
+    allowDots: false,
+    charset: 'utf-8',
+    charsetSentinel: false,
+    delimiter: '&',
+    encode: true,
+    encoder: utils.encode,
+    encodeValuesOnly: false,
+    format: defaultFormat,
+    formatter: formats.formatters[defaultFormat],
+    // deprecated
+    indices: false,
+    serializeDate: function serializeDate(date) {
+        return toISO.call(date);
+    },
+    skipNulls: false,
+    strictNullHandling: false
+};
+
+var isNonNullishPrimitive = function isNonNullishPrimitive(v) {
+    return typeof v === 'string'
+        || typeof v === 'number'
+        || typeof v === 'boolean'
+        || typeof v === 'symbol'
+        || typeof v === 'bigint';
+};
+
+var stringify = function stringify(
+    object,
+    prefix,
+    generateArrayPrefix,
+    strictNullHandling,
+    skipNulls,
+    encoder,
+    filter,
+    sort,
+    allowDots,
+    serializeDate,
+    formatter,
+    encodeValuesOnly,
+    charset
+) {
+    var obj = object;
+    if (typeof filter === 'function') {
+        obj = filter(prefix, obj);
+    } else if (obj instanceof Date) {
+        obj = serializeDate(obj);
+    } else if (generateArrayPrefix === 'comma' && isArray(obj)) {
+        obj = utils.maybeMap(obj, function (value) {
+            if (value instanceof Date) {
+                return serializeDate(value);
+            }
+            return value;
+        }).join(',');
+    }
+
+    if (obj === null) {
+        if (strictNullHandling) {
+            return encoder && !encodeValuesOnly ? encoder(prefix, defaults.encoder, charset, 'key') : prefix;
+        }
+
+        obj = '';
+    }
+
+    if (isNonNullishPrimitive(obj) || utils.isBuffer(obj)) {
+        if (encoder) {
+            var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults.encoder, charset, 'key');
+            return [formatter(keyValue) + '=' + formatter(encoder(obj, defaults.encoder, charset, 'value'))];
+        }
+        return [formatter(prefix) + '=' + formatter(String(obj))];
+    }
+
+    var values = [];
+
+    if (typeof obj === 'undefined') {
+        return values;
+    }
+
+    var objKeys;
+    if (isArray(filter)) {
+        objKeys = filter;
+    } else {
+        var keys = Object.keys(obj);
+        objKeys = sort ? keys.sort(sort) : keys;
+    }
+
+    for (var i = 0; i < objKeys.length; ++i) {
+        var key = objKeys[i];
+        var value = obj[key];
+
+        if (skipNulls && value === null) {
+            continue;
+        }
+
+        var keyPrefix = isArray(obj)
+            ? typeof generateArrayPrefix === 'function' ? generateArrayPrefix(prefix, key) : prefix
+            : prefix + (allowDots ? '.' + key : '[' + key + ']');
+
+        pushToArray(values, stringify(
+            value,
+            keyPrefix,
+            generateArrayPrefix,
+            strictNullHandling,
+            skipNulls,
+            encoder,
+            filter,
+            sort,
+            allowDots,
+            serializeDate,
+            formatter,
+            encodeValuesOnly,
+            charset
+        ));
+    }
+
+    return values;
+};
+
+var normalizeStringifyOptions = function normalizeStringifyOptions(opts) {
+    if (!opts) {
+        return defaults;
+    }
+
+    if (opts.encoder !== null && opts.encoder !== undefined && typeof opts.encoder !== 'function') {
+        throw new TypeError('Encoder has to be a function.');
+    }
+
+    var charset = opts.charset || defaults.charset;
+    if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+        throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
+    }
+
+    var format = formats['default'];
+    if (typeof opts.format !== 'undefined') {
+        if (!has.call(formats.formatters, opts.format)) {
+            throw new TypeError('Unknown format option provided.');
+        }
+        format = opts.format;
+    }
+    var formatter = formats.formatters[format];
+
+    var filter = defaults.filter;
+    if (typeof opts.filter === 'function' || isArray(opts.filter)) {
+        filter = opts.filter;
+    }
+
+    return {
+        addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,
+        allowDots: typeof opts.allowDots === 'undefined' ? defaults.allowDots : !!opts.allowDots,
+        charset: charset,
+        charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
+        delimiter: typeof opts.delimiter === 'undefined' ? defaults.delimiter : opts.delimiter,
+        encode: typeof opts.encode === 'boolean' ? opts.encode : defaults.encode,
+        encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults.encoder,
+        encodeValuesOnly: typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults.encodeValuesOnly,
+        filter: filter,
+        formatter: formatter,
+        serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
+        skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
+        sort: typeof opts.sort === 'function' ? opts.sort : null,
+        strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling
+    };
+};
+
+module.exports = function (object, opts) {
+    var obj = object;
+    var options = normalizeStringifyOptions(opts);
+
+    var objKeys;
+    var filter;
+
+    if (typeof options.filter === 'function') {
+        filter = options.filter;
+        obj = filter('', obj);
+    } else if (isArray(options.filter)) {
+        filter = options.filter;
+        objKeys = filter;
+    }
+
+    var keys = [];
+
+    if (typeof obj !== 'object' || obj === null) {
+        return '';
+    }
+
+    var arrayFormat;
+    if (opts && opts.arrayFormat in arrayPrefixGenerators) {
+        arrayFormat = opts.arrayFormat;
+    } else if (opts && 'indices' in opts) {
+        arrayFormat = opts.indices ? 'indices' : 'repeat';
+    } else {
+        arrayFormat = 'indices';
+    }
+
+    var generateArrayPrefix = arrayPrefixGenerators[arrayFormat];
+
+    if (!objKeys) {
+        objKeys = Object.keys(obj);
+    }
+
+    if (options.sort) {
+        objKeys.sort(options.sort);
+    }
+
+    for (var i = 0; i < objKeys.length; ++i) {
+        var key = objKeys[i];
+
+        if (options.skipNulls && obj[key] === null) {
+            continue;
+        }
+        pushToArray(keys, stringify(
+            obj[key],
+            key,
+            generateArrayPrefix,
+            options.strictNullHandling,
+            options.skipNulls,
+            options.encode ? options.encoder : null,
+            options.filter,
+            options.sort,
+            options.allowDots,
+            options.serializeDate,
+            options.formatter,
+            options.encodeValuesOnly,
+            options.charset
+        ));
+    }
+
+    var joined = keys.join(options.delimiter);
+    var prefix = options.addQueryPrefix === true ? '?' : '';
+
+    if (options.charsetSentinel) {
+        if (options.charset === 'iso-8859-1') {
+            // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
+            prefix += 'utf8=%26%2310003%3B&';
+        } else {
+            // encodeURIComponent('✓')
+            prefix += 'utf8=%E2%9C%93&';
+        }
+    }
+
+    return joined.length > 0 ? prefix + joined : '';
+};
+
+
+/***/ }),
+
+/***/ 2360:
+/***/ ((module) => {
+
+"use strict";
+
+
+var has = Object.prototype.hasOwnProperty;
+var isArray = Array.isArray;
+
+var hexTable = (function () {
+    var array = [];
+    for (var i = 0; i < 256; ++i) {
+        array.push('%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase());
+    }
+
+    return array;
+}());
+
+var compactQueue = function compactQueue(queue) {
+    while (queue.length > 1) {
+        var item = queue.pop();
+        var obj = item.obj[item.prop];
+
+        if (isArray(obj)) {
+            var compacted = [];
+
+            for (var j = 0; j < obj.length; ++j) {
+                if (typeof obj[j] !== 'undefined') {
+                    compacted.push(obj[j]);
+                }
+            }
+
+            item.obj[item.prop] = compacted;
+        }
+    }
+};
+
+var arrayToObject = function arrayToObject(source, options) {
+    var obj = options && options.plainObjects ? Object.create(null) : {};
+    for (var i = 0; i < source.length; ++i) {
+        if (typeof source[i] !== 'undefined') {
+            obj[i] = source[i];
+        }
+    }
+
+    return obj;
+};
+
+var merge = function merge(target, source, options) {
+    /* eslint no-param-reassign: 0 */
+    if (!source) {
+        return target;
+    }
+
+    if (typeof source !== 'object') {
+        if (isArray(target)) {
+            target.push(source);
+        } else if (target && typeof target === 'object') {
+            if ((options && (options.plainObjects || options.allowPrototypes)) || !has.call(Object.prototype, source)) {
+                target[source] = true;
+            }
+        } else {
+            return [target, source];
+        }
+
+        return target;
+    }
+
+    if (!target || typeof target !== 'object') {
+        return [target].concat(source);
+    }
+
+    var mergeTarget = target;
+    if (isArray(target) && !isArray(source)) {
+        mergeTarget = arrayToObject(target, options);
+    }
+
+    if (isArray(target) && isArray(source)) {
+        source.forEach(function (item, i) {
+            if (has.call(target, i)) {
+                var targetItem = target[i];
+                if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
+                    target[i] = merge(targetItem, item, options);
+                } else {
+                    target.push(item);
+                }
+            } else {
+                target[i] = item;
+            }
+        });
+        return target;
+    }
+
+    return Object.keys(source).reduce(function (acc, key) {
+        var value = source[key];
+
+        if (has.call(acc, key)) {
+            acc[key] = merge(acc[key], value, options);
+        } else {
+            acc[key] = value;
+        }
+        return acc;
+    }, mergeTarget);
+};
+
+var assign = function assignSingleSource(target, source) {
+    return Object.keys(source).reduce(function (acc, key) {
+        acc[key] = source[key];
+        return acc;
+    }, target);
+};
+
+var decode = function (str, decoder, charset) {
+    var strWithoutPlus = str.replace(/\+/g, ' ');
+    if (charset === 'iso-8859-1') {
+        // unescape never throws, no try...catch needed:
+        return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
+    }
+    // utf-8
+    try {
+        return decodeURIComponent(strWithoutPlus);
+    } catch (e) {
+        return strWithoutPlus;
+    }
+};
+
+var encode = function encode(str, defaultEncoder, charset) {
+    // This code was originally written by Brian White (mscdex) for the io.js core querystring library.
+    // It has been adapted here for stricter adherence to RFC 3986
+    if (str.length === 0) {
+        return str;
+    }
+
+    var string = str;
+    if (typeof str === 'symbol') {
+        string = Symbol.prototype.toString.call(str);
+    } else if (typeof str !== 'string') {
+        string = String(str);
+    }
+
+    if (charset === 'iso-8859-1') {
+        return escape(string).replace(/%u[0-9a-f]{4}/gi, function ($0) {
+            return '%26%23' + parseInt($0.slice(2), 16) + '%3B';
+        });
+    }
+
+    var out = '';
+    for (var i = 0; i < string.length; ++i) {
+        var c = string.charCodeAt(i);
+
+        if (
+            c === 0x2D // -
+            || c === 0x2E // .
+            || c === 0x5F // _
+            || c === 0x7E // ~
+            || (c >= 0x30 && c <= 0x39) // 0-9
+            || (c >= 0x41 && c <= 0x5A) // a-z
+            || (c >= 0x61 && c <= 0x7A) // A-Z
+        ) {
+            out += string.charAt(i);
+            continue;
+        }
+
+        if (c < 0x80) {
+            out = out + hexTable[c];
+            continue;
+        }
+
+        if (c < 0x800) {
+            out = out + (hexTable[0xC0 | (c >> 6)] + hexTable[0x80 | (c & 0x3F)]);
+            continue;
+        }
+
+        if (c < 0xD800 || c >= 0xE000) {
+            out = out + (hexTable[0xE0 | (c >> 12)] + hexTable[0x80 | ((c >> 6) & 0x3F)] + hexTable[0x80 | (c & 0x3F)]);
+            continue;
+        }
+
+        i += 1;
+        c = 0x10000 + (((c & 0x3FF) << 10) | (string.charCodeAt(i) & 0x3FF));
+        out += hexTable[0xF0 | (c >> 18)]
+            + hexTable[0x80 | ((c >> 12) & 0x3F)]
+            + hexTable[0x80 | ((c >> 6) & 0x3F)]
+            + hexTable[0x80 | (c & 0x3F)];
+    }
+
+    return out;
+};
+
+var compact = function compact(value) {
+    var queue = [{ obj: { o: value }, prop: 'o' }];
+    var refs = [];
+
+    for (var i = 0; i < queue.length; ++i) {
+        var item = queue[i];
+        var obj = item.obj[item.prop];
+
+        var keys = Object.keys(obj);
+        for (var j = 0; j < keys.length; ++j) {
+            var key = keys[j];
+            var val = obj[key];
+            if (typeof val === 'object' && val !== null && refs.indexOf(val) === -1) {
+                queue.push({ obj: obj, prop: key });
+                refs.push(val);
+            }
+        }
+    }
+
+    compactQueue(queue);
+
+    return value;
+};
+
+var isRegExp = function isRegExp(obj) {
+    return Object.prototype.toString.call(obj) === '[object RegExp]';
+};
+
+var isBuffer = function isBuffer(obj) {
+    if (!obj || typeof obj !== 'object') {
+        return false;
+    }
+
+    return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
+};
+
+var combine = function combine(a, b) {
+    return [].concat(a, b);
+};
+
+var maybeMap = function maybeMap(val, fn) {
+    if (isArray(val)) {
+        var mapped = [];
+        for (var i = 0; i < val.length; i += 1) {
+            mapped.push(fn(val[i]));
+        }
+        return mapped;
+    }
+    return fn(val);
+};
+
+module.exports = {
+    arrayToObject: arrayToObject,
+    assign: assign,
+    combine: combine,
+    compact: compact,
+    decode: decode,
+    encode: encode,
+    isBuffer: isBuffer,
+    isRegExp: isRegExp,
+    maybeMap: maybeMap,
+    merge: merge
+};
+
+
+/***/ }),
+
 /***/ 4959:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
@@ -34283,8 +35157,10 @@ async function connectPublish(args) {
     core.debug(`using base URL ${baseURL}`);
     const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL });
     await client.serverSettings();
-    const { accessType, dirs, force, ns, showLogs } = args;
-    return await publishFromDirs({ accessType, client, dirs, force, ns, showLogs })
+    const { accessType, dirs, force, ns, requireVanityPath, showLogs } = args;
+    return await publishFromDirs({
+        accessType, client, dirs, force, ns, requireVanityPath, showLogs
+    })
         .then((results) => {
         core.info(`\n${bold('connect-publish results', ansi_styles_1.default.blue)}${bold(':')}`);
         results.forEach((res) => {
@@ -34328,19 +35204,19 @@ async function connectPublish(args) {
     });
 }
 exports.connectPublish = connectPublish;
-async function publishFromDirs({ accessType, client, dirs, force, ns, showLogs }) {
+async function publishFromDirs({ accessType, client, dirs, force, ns, requireVanityPath, showLogs }) {
     const ret = [];
     const deployer = new rsconnect.Deployer(client);
     for (const dir of dirs) {
         ret.push(await publishFromDir(deployer, dir, {
-            accessType, client, dirs: [], force, ns, showLogs
+            accessType, client, dirs: [], force, ns, requireVanityPath, showLogs
         }));
     }
     return ret;
 }
-async function publishFromDir(deployer, dir, { accessType, client, force, ns, showLogs }) {
+async function publishFromDir(deployer, dir, { accessType, client, force, ns, requireVanityPath, showLogs }) {
     let dirName = dir;
-    let appPath;
+    let appIdentifier;
     if (dir.match(/[^:]+:[^:]+/) !== null) {
         const parts = dir.split(/:/);
         if (parts.length !== 2) {
@@ -34352,29 +35228,35 @@ async function publishFromDir(deployer, dir, { accessType, client, force, ns, sh
             ].join(' '));
         }
         dirName = parts[0];
-        appPath = parts[1];
+        appIdentifier = parts[1];
     }
-    if (appPath === undefined) {
-        appPath = rsconnect.ApplicationPather.strictAppPath(dirName);
-        core.debug(`strict path=${JSON.stringify(appPath)} derived from dir=${JSON.stringify(dirName)}`);
+    if (appIdentifier === undefined) {
+        appIdentifier = rsconnect.ApplicationPather.strictAppPath(dirName);
+        core.debug(`strict path=${JSON.stringify(appIdentifier)} derived from dir=${JSON.stringify(dirName)}`);
     }
     if (ns !== undefined) {
         core.debug([
             'prefixing',
-            `path=${JSON.stringify(appPath)}`,
+            `path=${JSON.stringify(appIdentifier)}`,
             'with',
             `namespace=${JSON.stringify(ns)}`
         ].join(' '));
-        appPath = rsconnect.ApplicationPather.strictAppPath([ns, appPath].join('/'));
+        appIdentifier = rsconnect.ApplicationPather.strictAppPath([ns, appIdentifier].join('/'));
     }
     core.debug([
         'publishing',
         `dir=${JSON.stringify(dirName)}`,
-        `path=${JSON.stringify(appPath)}`,
+        `path=${JSON.stringify(appIdentifier)}`,
         `force=${JSON.stringify(force)}`,
         `accessType=${JSON.stringify(accessType)}`
     ].join(' '));
-    return await deployer.deployManifest(path_1.default.join(dirName, 'manifest.json'), appPath, force, accessType).then((resp) => {
+    return await deployer.deployManifest({
+        accessType,
+        appIdentifier,
+        force,
+        manifestPath: path_1.default.join(dirName, 'manifest.json'),
+        requireVanityPath
+    }).then((resp) => {
         let publishing = 'publishing';
         let why = '';
         if (resp.noOp) {
@@ -34384,6 +35266,7 @@ async function publishFromDir(deployer, dir, { accessType, client, force, ns, sh
         core.info([
             `${publishing} ${bold(dirName)} to ${bold(resp.appUrl)}${why}`,
             `     id: ${bold(resp.appId.toString())}`,
+            `   name: ${bold(resp.appName.toString())}`,
             `   guid: ${bold(resp.appGuid)}`,
             `  title: ${bold(resp.title)}`
         ].join('\n'));
@@ -34449,6 +35332,7 @@ function loadArgs() {
     }
     const force = asBool(core.getInput('force'));
     const showLogs = asBool(core.getInput('show-logs'));
+    const requireVanityPath = asBool(core.getInput('require-vanity-path'));
     let accessType = core.getInput('access-type').toLowerCase().trim();
     if (accessType === '') {
         accessType = undefined;
@@ -34462,13 +35346,14 @@ function loadArgs() {
         ns = undefined;
     }
     return {
+        accessType,
         apiKey,
         dirs,
-        url: url.toString(),
         force,
         ns,
+        requireVanityPath,
         showLogs,
-        accessType
+        url: url.toString()
     };
 }
 exports.loadArgs = loadArgs;

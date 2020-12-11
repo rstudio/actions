@@ -1062,16 +1062,18 @@
     "@types/yargs" "^15.0.0"
     chalk "^4.0.0"
 
-"@rstudio/rsconnect-ts@^0.3.0":
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/@rstudio/rsconnect-ts/-/rsconnect-ts-0.3.0.tgz#81e556eeea196dab1bdd67b3d1607f7487e73a8d"
-  integrity sha512-Es/nEJN+Q0CGnORmEBA711LCgE6p3u0eVusJ+u++2mvrIrp9cQCWrFjvK+Ihzu+X+v9AO0QIvgCkOwlG5jgvWQ==
+"@rstudio/rsconnect-ts@^0.4.0":
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/@rstudio/rsconnect-ts/-/rsconnect-ts-0.4.0.tgz#b65575c9d3d949dad8402137a4d4fea03142ca26"
+  integrity sha512-GlcOIxRZ/WkH3n/LN3yvwJqs0DF0R4aJD6GmqqiPhcPO4cGBt4+W7en3v4LMKEft0YOcCIN3SFo5DRDsG+EbqA==
   dependencies:
     "@types/lodash" "^4.14.165"
+    "@types/qs" "^6.9.5"
     "@types/tar" "^4.0.4"
     "@types/tmp" "^0.2.0"
     axios "^0.21.0"
     lodash "^4.17.20"
+    qs "^6.9.4"
     tar "^6.0.5"
     tmp "^0.2.1"
 
@@ -1202,6 +1204,11 @@
   version "2.1.5"
   resolved "https://registry.yarnpkg.com/@types/prettier/-/prettier-2.1.5.tgz#b6ab3bba29e16b821d84e09ecfaded462b816b00"
   integrity sha512-UEyp8LwZ4Dg30kVU2Q3amHHyTn1jEdhCIE59ANed76GaT1Vp76DD3ZWSAxgCrw6wJ0TqeoBpqmfUHiUDPs//HQ==
+
+"@types/qs@^6.9.5":
+  version "6.9.5"
+  resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.5.tgz#434711bdd49eb5ee69d90c1d67c354a9a8ecb18b"
+  integrity sha512-/JHkVHtx/REVG0VVToGRGH2+23hsYLHdyG+GrvoUGlGAd0ErauXDyvHtRI/7H7mzLm+tBCKA7pfcpkQ1lf58iQ==
 
 "@types/stack-utils@^2.0.0":
   version "2.0.0"
@@ -4397,6 +4404,11 @@ punycode@^2.1.0, punycode@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
+
+qs@^6.9.4:
+  version "6.9.4"
+  resolved "https://registry.yarnpkg.com/qs/-/qs-6.9.4.tgz#9090b290d1f91728d3c22e54843ca44aea5ab687"
+  integrity sha512-A1kFqHekCTM7cz0udomYUoYNWjBebHm/5wzU/XqrBRBNWectVH0QIiN+NEcZ0Dte5hvzHwbr8+XQmguPhJ6WdQ==
 
 qs@~6.5.2:
   version "6.5.2"

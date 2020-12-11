@@ -23,10 +23,18 @@ part.
 ### `dir`
 
 Directory or directories containing the content to publish,
-optionally with `:<vanity-URL>` suffixes, separated by newlines.
-Without a `:<vanity-URL>` suffix, the value of the directory path
-will be used to match any existing published content. (Default
-`"."`)
+optionally with `:<app-identifier>` suffixes, separated by
+newlines. Without a `:<app-identifier>` suffix, the value of the
+directory path will be used to match any existing published
+content. (Default `"."`)
+
+> **NOTE** The `:<app-identifier>` may be one of the following:
+> - GUID, e.g. `ffffffff-aaaa-ffff-aaaa-ffffffffffff`, which is
+>   used when the string is a valid GUID
+> - name, e.g. `name-without-slashes`, which is tried when the
+>   string *does not* contain at least one slash
+> - vanity URL (path), e.g. `/name-with/a-slash`, which is tried
+>   when the string *does* contain at least one slash
 
 ### `api-key`
 
@@ -88,6 +96,17 @@ Force publish even if up to date. (Default `false`)
 > current bundle according to RStudio Connect. If available, the
 > bundle SHA1 digest is compared, else the bundle size is compared.
 
+### `require-vanity-path`
+
+Require setting the vanity path. (Default `false`)
+
+A given RStudio Connect server may be configured such that an
+application's vanity path may not be set by users with the
+`publisher` role. The default behavior will attempt to set the
+vanity path and any failure to do so will be logged in the debug
+logs. By setting `require-vanity-path: true`, any failure to set
+the vanity path will bubble up as an error and cancel publishing.
+
 ## Outputs
 
 ### `results`
@@ -109,7 +128,7 @@ steps:
       access-type: logged_in
       dir: |
         ./very-shiny-app/:/shiny/app/path/
-        ./useful-rmarkdown-report/:/reports/useful/
+        ./useful-rmarkdown-report/:useful-report-for-cats
         ./slick-flask-api/
-        ./insightful-jupyter-notebook/:/notebooks/insights/
+        ./insightful-jupyter-notebook/:528f3dc0-3bd0-41e6-a191-aa264c451416
 ```
