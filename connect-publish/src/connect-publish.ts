@@ -42,6 +42,7 @@ interface publishArgs {
 }
 
 interface deployPollingResult {
+  envUpdater: rsconnect.EnvironmentUpdater
   resp: rsconnect.DeployTaskResponse
   poller: rsconnect.ClientTaskPoller
   showLogs: boolean
@@ -51,8 +52,9 @@ export type Success = boolean | 'SKIP'
 
 export interface ConnectPublishResult {
   dir: string
-  url: string
+  id: number
   success: Success
+  url: string
 }
 
 export class ConnectPublishErrorResult extends Error {
@@ -97,6 +99,7 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
         }
 
         core.info('  ' + ([
+          `    id: ${bold(res.id.toString())}`,
           `   dir: ${bold(res.dir)}`,
           `   url: ${bold(res.url)}`,
           `status: ${bold(successChar, successColor)}`
@@ -127,8 +130,9 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
 async function publishFromDirs ({ accessType, client, dirs, force, ns, requireVanityPath, showLogs }: publishArgs): Promise<ConnectPublishResult[]> {
   const ret: ConnectPublishResult[] = []
   const deployer = new rsconnect.Deployer(client)
+  const envUpdater = new rsconnect.EnvironmentUpdater(client)
   for (const dir of dirs) {
-    ret.push(await publishFromDir(deployer, dir, {
+    ret.push(await publishFromDir(deployer, envUpdater, dir, {
       accessType, client, dirs: [], force, ns, requireVanityPath, showLogs
     }))
   }
@@ -137,6 +141,7 @@ async function publishFromDirs ({ accessType, client, dirs, force, ns, requireVa
 
 async function publishFromDir (
   deployer: rsconnect.Deployer,
+  envUpdater: rsconnect.EnvironmentUpdater,
   dir: string,
   { accessType, client, force, ns, requireVanityPath, showLogs }: publishArgs
 ): Promise<ConnectPublishResult> {
@@ -203,12 +208,13 @@ async function publishFromDir (
     ].join('\n'))
 
     return {
+      envUpdater,
+      poller: new rsconnect.ClientTaskPoller(client, resp.taskId),
       resp,
-      showLogs,
-      poller: new rsconnect.ClientTaskPoller(client, resp.taskId)
+      showLogs
     }
   })
-    .then(async ({ resp, poller, showLogs }: deployPollingResult): Promise<ConnectPublishResult> => {
+    .then(async ({ envUpdater, poller, resp, showLogs }: deployPollingResult): Promise<ConnectPublishResult> => {
       let success: Success = resp.noOp ? 'SKIP' : true
       for await (const result of poller.poll()) {
         core.debug(`received poll result: ${JSON.stringify(result)}`)
@@ -221,10 +227,36 @@ async function publishFromDir (
           success = false
         }
       }
+
+      core.debug([
+        'updating environment',
+        `dir=${dirName}`,
+        `id=${resp.appId}`
+      ].join(' '))
+
+      const env = await envUpdater.updateAppEnvironment(resp.appId, dirName)
+      if (env.size === 0) {
+        core.debug([
+          'no environment variables updated for',
+          `dir=${dirName}`,
+          `id=${resp.appId}`
+        ].join(' '))
+      } else {
+        for (const key of env.keys()) {
+          core.debug([
+            'updated environment',
+            `variable=${JSON.stringify(key)}`,
+            `id=${resp.appId}`,
+            `dir=${dirName}`
+          ].join(' '))
+        }
+      }
+
       return {
         dir: dirName,
-        url: resp.appUrl,
-        success
+        id: resp.appId,
+        success,
+        url: resp.appUrl
       }
     })
     .catch((err: any) => {
@@ -234,8 +266,9 @@ async function publishFromDir (
       core.error(err as Error)
       return {
         dir: dirName,
-        url: '',
-        success: false
+        id: -1,
+        success: false,
+        url: ''
       }
     })
 }
