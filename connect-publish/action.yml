@@ -20,6 +20,9 @@ inputs:
   show-logs:
     description: Show all publishing logs
     default: false
+  update-env:
+    description: Update content environment variables
+    default: true
   url:
     description: RStudio Connect URL
 runs:
