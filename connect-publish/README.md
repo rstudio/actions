@@ -107,13 +107,71 @@ vanity path and any failure to do so will be logged in the debug
 logs. By setting `require-vanity-path: true`, any failure to set
 the vanity path will bubble up as an error and cancel publishing.
 
+### `update-env`
+
+Update content environment variables. (Default `true`)
+
+The environment variables configured for published content may be
+configured via the running process environment and via a specific
+set of files relative to the content directory.
+
+#### setting from process environment
+
+Any environment variable in the process environment that begins
+with the prefix `CONNECT_ENV_SET_` will be set without the prefix,
+e.g.:
+
+```yaml
+# ...
+steps:
+  - name: Publish some things
+    uses: rstudio/actions/connect-publish@main
+    env:
+      CONNECT_ENV_SET_MYVAR: available at runtime
+    with:
+      url: https://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@connect.example.org
+      access-type: logged_in
+      dir: |
+        ./flask-api/
+```
+
+will result in the following variable being configured on the
+published content:
+
+- `MYVAR='available at runtime'`
+
+#### setting from environment file
+
+The first of the following files that is found will be read:
+
+- `.rstudio-connect.env`
+- `rstudio-connect.env`
+- `rsconnect/env`
+- `rsconnect-python/env`
+
+The content of the file is expected to be shell-like with variables
+defined, and may contain comments, e.g.:
+
+```bash
+# the following variable is available at runtime
+SECRET_INGREDIENT='tartlet'
+
+# referencing the variable name without an assignment will read the
+# variable from the process environment
+MYVAR
+
+# variables with leading "export" or "set" work, too
+export FRIENDS="great"
+set PASTA='usually awesome'
+```
+
 ## Outputs
 
 ### `results`
 
 JSON-serialized array of objects, each containing a `dir`, `url`,
-and `success` key indicating per-directory publish success. In case
-of an unhandled error, the value will be an empty array.
+`id`, and `success` key indicating per-directory publish success.
+In case of an unhandled error, the value will be an empty array.
 
 ## Example usage
 
