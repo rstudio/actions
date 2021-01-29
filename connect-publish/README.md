@@ -170,8 +170,8 @@ set PASTA='usually awesome'
 ### `results`
 
 JSON-serialized array of objects, each containing a `dir`, `url`,
-and `success` key indicating per-directory publish success. In case
-of an unhandled error, the value will be an empty array.
+`id`, and `success` key indicating per-directory publish success.
+In case of an unhandled error, the value will be an empty array.
 
 ## Example usage
 
