@@ -1,14 +1,24 @@
-steps:
-  - uses: actions/checkout@v2
+name: main
+on:
+  push:
+    branches: [main]
 
-  - name: Publish Connect content
-    uses: rstudio/actions/connect-publish@main
-    with:
-      url: connect.example.com
-      api-key: {{ secrets.CONNECT_API_KEY }}
-      access-type: acl
-      dir: |
-        ./very-shiny-app/:/shiny/app/path/
-        ./useful-rmarkdown-report/:useful-report-for-cats
-        ./slick-flask-api/
-        ./insightful-jupyter-notebook/:528f3dc0-3bd0-41e6-a191-aa264c451416
+name: connect-publish
+  
+jobs:
+  connect-publish:
+    name: connect-publish
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Publish Connect content
+        uses: rstudio/actions/connect-publish@main
+        with:
+          url: connect.example.com
+          api-key: {{ secrets.CONNECT_API_KEY }}
+          access-type: acl
+          dir: |
+            ./very-shiny-app/:/shiny/app/path/
+            ./useful-rmarkdown-report/:useful-report-for-cats
+            ./slick-flask-api/
+            ./insightful-jupyter-notebook/:528f3dc0-3bd0-41e6-a191-aa264c451416
