@@ -13,7 +13,7 @@ jobs:
         uses: rstudio/actions/connect-publish@main
         with:
           url: connect.example.com
-          api-key: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
+          api-key: ${{ secrets.CONNECT_API_KEY }}
           access-type: acl
           dir: |
             ./very-shiny-app/:/shiny/app/path/
