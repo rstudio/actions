@@ -2,9 +2,11 @@ name: main
 on:
   push:
     branches: [main]
-  pull_request_target:
+  pull_request:
     branches: [main]
-    types: [labeled]
+  # TODO: figure out how to split things up to handle labeled pull requests
+  # pull_request_target:
+  #   types: [labeled]
 jobs:
   setup-connect:
     runs-on: ${{ matrix.os }}
@@ -67,12 +69,14 @@ jobs:
       - run: yarn lint
       - run: yarn build
       - run: docker-compose up -d
-      - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
-        run: yarn test
+      # TODO: figure out how to split things up to handle labeled pull requests
+      # - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+      - run: yarn test
         env:
           RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
-      - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
-        uses: ./connect-publish
+      # TODO: figure out how to split things up to handle labeled pull requests
+      # - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+      - uses: ./connect-publish
         id: connect-publish
         with:
           url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
