@@ -9,6 +9,17 @@ This action may be use for publishing to RStudio Connect.
 > earlier GitHub Actions step or performed locally and stored in
 > git.
 
+## Using this Action
+
+R users may find it easiest to set up scaffolding for GitHub Actions using the [`usethis`](https://usethis.r-lib.org/) package. 
+
+You can import and use this GitHub Action in your project using 
+```r
+usethis::use_github_action(url = "https://raw.githubusercontent.com/rstudio/actions/usethis/examples/connect-publish.yaml")
+```
+
+Once imported, you can adjust the settings below to match your use case.
+
 ## Inputs
 
 ### `url`
