@@ -15,7 +15,7 @@ R users may find it easiest to set up scaffolding for GitHub Actions using the [
 
 You can import and use this GitHub Action in your project using 
 ```r
-usethis::use_github_action(url = "https://raw.githubusercontent.com/rstudio/actions/usethis/examples/connect-publish.yaml")
+usethis::use_github_action(url = "https://raw.githubusercontent.com/rstudio/actions/main/examples/connect-publish.yaml")
 ```
 
 Once imported, you can adjust the settings below to match your use case.
