@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
-import * as style from 'ansi-styles'
+import styles from 'ansi-styles'
 
 class ActionArgs {
   public pyRuntime: boolean = false
@@ -57,18 +57,18 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
     )
     .then(() => {
       core.info([
-        style.greenBright.open,
-        style.bold.open,
+        styles.greenBright.open,
+        styles.bold.open,
         'Installed rsconnect',
-        style.reset.close
+        styles.reset.close
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
-        style.yellowBright.open,
-        style.bold.open,
+        styles.yellowBright.open,
+        styles.bold.open,
         errInstallR,
-        style.reset.close
+        styles.reset.close
       ].join(''))
       core.setFailed(err)
     })
@@ -96,18 +96,18 @@ async function ensureRSConnectPython (pyVersion: string): Promise<any> {
     .then(async () => await exec.exec('python', ['-m', 'pip', 'install', spec]))
     .then(() => {
       core.info([
-        style.greenBright.open,
-        style.bold.open,
+        styles.greenBright.open,
+        styles.bold.open,
         'Installed rsconnect-python, which is available as "rsconnect"',
-        style.reset.close
+        styles.reset.close
       ].join(''))
     })
     .catch((err: any) => {
       core.error([
-        style.yellowBright.open,
-        style.bold.open,
+        styles.yellowBright.open,
+        styles.bold.open,
         errInstallPython,
-        style.reset.close
+        styles.reset.close
       ].join(''))
       core.setFailed(err)
     })
