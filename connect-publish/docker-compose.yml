@@ -11,9 +11,7 @@ services:
     privileged: true
     depends_on:
       - db
-    # TODO: when available
-    # image: rstudio/rstudio-connect:1.8.6
-    image: rstudio/rstudio-connect:1.8.4.2-2
+    image: rstudio/rstudio-connect:2021.12.1
     volumes:
       - ./.cache/data:/data
       - ./__tests__/rstudio-connect.test.gcfg:/etc/rstudio-connect/rstudio-connect.gcfg
