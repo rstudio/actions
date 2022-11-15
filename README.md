@@ -7,3 +7,4 @@ GitHub Actions for use with RStudio software.
 - [setup-connect](./setup-connect)
 - [connect-publish](./connect-publish)
 - [package-manager-publish-r](./package-manager-publish-r/)
+- [package-manager-publish-python](./package-manager-publish-python/)

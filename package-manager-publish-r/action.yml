@@ -27,8 +27,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v3
-
     - name: Set up Pandoc for vignette building
       uses: r-lib/actions/setup-pandoc@v2
 
