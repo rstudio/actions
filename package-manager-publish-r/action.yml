@@ -66,7 +66,7 @@ runs:
         PACKAGEMANAGER_ADDRESS: ${{ inputs.url }}
         PACKAGEMANAGER_TOKEN: ${{ inputs.api-token }}
       run: |
-        curl -fOJLH "Authorization: Bearer ${PACKAGEMANAGER_TOKEN}" ${PACKAGEMANAGER_ADDRESS}/__api__/download${{ runner.os == 'Windows' && '?os=windows' || '' }}
+        curl -fL -o rspm -H "Authorization: Bearer ${PACKAGEMANAGER_TOKEN}" ${PACKAGEMANAGER_ADDRESS}/__api__/download${{ runner.os == 'Windows' && '?os=windows' || '' }}
         chmod +x ./rspm
       shell: bash
 
