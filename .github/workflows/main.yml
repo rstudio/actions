@@ -68,26 +68,30 @@ jobs:
       - run: npm install
       - run: npm run lint
       - run: npm run build
-      - run: docker-compose up -d
-      # TODO: figure out how to split things up to handle labeled pull requests
-      # - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
-      - run: npm test
-        env:
-          RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
-      # TODO: figure out how to split things up to handle labeled pull requests
-      # - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
-      - uses: ./connect-publish
-        id: connect-publish
-        with:
-          url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
-          access-type: logged_in
-          show-logs: true
-          force: true
-          dir: |
-            connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
-            connect-publish/__tests__/testapps/flask:dont-forget-to-flask
-      - run: printf '${{ steps.connect-publish.outputs.results }}\n' | jq .
-      - if: failure()
-        run: docker-compose logs
-      - if: always()
-        run: docker-compose down --remove-orphans
+      # TODO: adapt tests to use bootstrapping method described at
+      # https://docs.posit.co/connect/admin/programmatic-provisioning/
+      # {
+      #- run: docker-compose up -d
+      ## TODO: figure out how to split things up to handle labeled pull requests
+      ## - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+      #- run: npm test
+      #  env:
+      #    RSTUDIO_CONNECT_API_KEY: ${{ secrets.RSTUDIO_CONNECT_API_KEY }}
+      ## TODO: figure out how to split things up to handle labeled pull requests
+      ## - if: contains(github.event.pull_request.labels.*.name, 'safe-to-test')
+      #- uses: ./connect-publish
+      #  id: connect-publish
+      #  with:
+      #    url: http://${{ secrets.RSTUDIO_CONNECT_API_KEY }}@127.0.0.1:23939
+      #    access-type: logged_in
+      #    show-logs: true
+      #    force: true
+      #    dir: |
+      #      connect-publish/__tests__/testapps/plumber:/the-most/plumbing/evar
+      #      connect-publish/__tests__/testapps/flask:dont-forget-to-flask
+      #- run: printf '${{ steps.connect-publish.outputs.results }}\n' | jq .
+      #- if: failure()
+      #  run: docker-compose logs
+      #- if: always()
+      #  run: docker-compose down --remove-orphans
+      # }
