@@ -2,21 +2,21 @@ import path from 'path'
 import { URL } from 'url'
 
 import * as core from '@actions/core'
-import style from 'ansi-styles'
+import styles, { CSPair } from 'ansi-styles'
 
 import * as rsconnect from '@rstudio/rsconnect-ts'
 
-function bold (txt: string, color?: style.CSPair): string {
+function bold (txt: string, color?: CSPair): string {
   const c = (
     color !== null && color !== undefined
       ? color
-      : style.white
+      : styles.white
   )
   return [
     c.open,
-    style.modifier.bold.open,
+    styles.modifier.bold.open,
     txt,
-    style.reset.close
+    styles.reset.close
   ].join('')
 }
 
@@ -82,21 +82,21 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
     accessType, client, dirs, force, ns, requireVanityPath, showLogs, updateEnv
   })
     .then((results: ConnectPublishResult[]) => {
-      core.info(`\n${bold('connect-publish results', style.blue)}${bold(':')}`)
+      core.info(`\n${bold('connect-publish results', styles.blue)}${bold(':')}`)
       results.forEach((res: ConnectPublishResult) => {
-        let successColor: style.CSPair
+        let successColor: CSPair
         let successChar: string
         switch (res.success) {
           case true:
-            successColor = style.green
+            successColor = styles.green
             successChar = '✔'
             break
           case 'SKIP':
-            successColor = style.yellow
+            successColor = styles.yellow
             successChar = 'SKIP'
             break
           default:
-            successColor = style.red
+            successColor = styles.red
             successChar = '✘'
             break
         }
@@ -202,7 +202,7 @@ async function publishFromDir (
     let publishing = 'publishing'
     let why = ''
     if (resp.noOp) {
-      publishing = bold('skipping publishing', style.yellow)
+      publishing = bold('skipping publishing', styles.yellow)
       why = ' (up to date)'
     }
     core.info([

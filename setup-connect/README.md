@@ -13,7 +13,7 @@ steps:
       python-version: '3.x'
   - uses: r-lib/actions/setup-r@v1
     with:
-      r-version: 3.6.3
+      r-version: 4.1.2
   - uses: rstudio/actions/setup-connect@main
   # ...
 ```
