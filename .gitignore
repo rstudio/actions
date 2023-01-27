@@ -12,6 +12,7 @@ wait-for
 .cache/
 .dynamodb/
 .env
+.envrc
 .env.test
 .eslintcache
 .fusebox/
@@ -19,6 +20,7 @@ wait-for
 .lock-wscript
 .node_repl_history
 .npm
+.nvmrc
 .nyc_output
 .rpt2_cache/
 .rts2_cache_cjs/
@@ -27,7 +29,6 @@ wait-for
 .serverless/
 .tern-port
 .vuepress/dist
-.yarn-integrity
 bower_components
 build/Release
 coverage
@@ -40,5 +41,3 @@ npm-debug.log*
 pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 typings/
-yarn-debug.log*
-yarn-error.log*

@@ -1,6 +1,11 @@
 module.exports = {
   clearMocks: true,
   coverageDirectory: 'coverage',
-  preset: 'ts-jest',
-  testEnvironment: 'node'
+  testEnvironment: 'node',
+
+  // NOTE: setting an empty transformIgnorePatterns is intentional
+  // so that typescript and otherwise un-transpiled dependencies
+  // are correctly transformed. {
+  transformIgnorePatterns: []
+  // }
 }
