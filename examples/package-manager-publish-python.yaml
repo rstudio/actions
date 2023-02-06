@@ -1,0 +1,19 @@
+name: package-manager-publish-python
+on:
+  push:
+    branches: [main]
+
+jobs:
+  package-manager-publish-python:
+    name: package-manager-publish-python
+    # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and Publish to Package Manager
+        uses: rstudio/actions/package-manager-publish-python@main
+        with:
+          url: http://packagemanager.example.com:4242
+          api-token: ${{ secrets.PPM_API_TOKEN }}
+          python-version: 3.x          
+          source: local-python
