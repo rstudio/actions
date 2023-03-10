@@ -30,6 +30,7 @@ export interface ActionArgs {
   showLogs: boolean
   updateEnv: boolean
   url: string
+  workingDirectory: string
 }
 
 interface publishArgs {
@@ -76,7 +77,9 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
   const client = new rsconnect.APIClient({ apiKey: args.apiKey, baseURL })
   await client.serverSettings()
 
-  const { accessType, dirs, force, ns, requireVanityPath, showLogs, updateEnv } = args
+  const { accessType, dirs, force, ns, requireVanityPath, showLogs, updateEnv, workingDirectory } = args
+
+  process.chdir(workingDirectory)
 
   return await publishFromDirs({
     accessType, client, dirs, force, ns, requireVanityPath, showLogs, updateEnv
@@ -302,6 +305,8 @@ export function loadArgs (): ActionArgs {
   url.password = ''
   url.username = ''
 
+  const workingDirectory = core.getInput('working-directory')
+
   const dirs = core.getInput('dir').split('\n').map(s => s.trim()).filter(s => s !== '')
   if (dirs.length === 0) {
     dirs.push('.')
@@ -334,7 +339,8 @@ export function loadArgs (): ActionArgs {
     requireVanityPath,
     showLogs,
     updateEnv,
-    url: url.toString()
+    url: url.toString(),
+    workingDirectory
   }
 }
 
