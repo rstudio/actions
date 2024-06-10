@@ -29,5 +29,5 @@ inputs:
     description: Directory relative to which the 'dir' argument(s) will be resolved
     default: .
 runs:
-  using: node16
+  using: node20
   main: dist/index.js
