@@ -79,7 +79,7 @@ function rscriptCommand (body: string): string[] {
     '--vanilla',
     '-e',
     [
-      'options(repos = list(\'@CRAN@\' = \'https://cloud.r-project.org\', CRAN = \'https://cran.rstudio.com\'))',
+      'options(repos = list(\'@CRAN@\' = \'https://cloud.r-project.org\', CRAN = \'https://packagemanager.posit.co/cran/latest\'))',
       body
     ].join(';')
   ]
