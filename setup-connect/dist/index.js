@@ -4088,7 +4088,7 @@ function rscriptCommand(body) {
         '--vanilla',
         '-e',
         [
-            'options(repos = list(\'@CRAN@\' = \'https://cloud.r-project.org\', CRAN = \'https://packagemanager.posit.co/cran/latest\'))',
+            'options(repos = list(CRAN = \'https://packagemanager.posit.co/cran/latest\', \'@CRAN@\' = \'https://cloud.r-project.org\'))',
             body
         ].join(';')
     ];
