@@ -51,6 +51,15 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
         'Rscript',
         rscriptCommand(
           // eslint-disable-next-line no-useless-escape
+          `remotes::install_version(\'openssl\')`
+        )
+      )
+    )
+    .then(
+      async () => await exec.exec(
+        'Rscript',
+        rscriptCommand(
+          // eslint-disable-next-line no-useless-escape
           `remotes::install_version(\'rsconnect\', version = ${version})`
         )
       )
