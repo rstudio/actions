@@ -51,7 +51,7 @@ async function ensureRsconnect (rVersion: string): Promise<any> {
         'Rscript',
         rscriptCommand(
           // eslint-disable-next-line no-useless-escape
-          `remotes::install_version(\'rsconnect\', version = ${version})`
+          `remotes::install_version(\'rsconnect\', version = ${version}, type = \'both\')`
         )
       )
     )
