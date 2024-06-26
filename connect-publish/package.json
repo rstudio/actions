@@ -24,9 +24,8 @@
   "dependencies": {
     "@actions/core": "^1.10.0",
     "@actions/exec": "^1.1.1",
-    "@rstudio/rsconnect-ts": "^0.6.2",
-    "ansi-styles": "^6.2.1",
-    "tough-cookie": "^4.1.2"
+    "@rstudio/rsconnect-ts": "^0.7.0",
+    "ansi-styles": "^6.2.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",
@@ -43,7 +42,7 @@
     "typescript": ">=3.3.1 <4.5.0"
   },
   "engines": {
-    "node": "^16"
+    "node": "^18"
   },
   "ts-standard": {
     "ignore": [
