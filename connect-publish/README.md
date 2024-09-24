@@ -47,6 +47,10 @@ content. (Default `"."`)
 > - vanity URL (path), e.g. `/name-with/a-slash`, which is tried
 >   when the string *does* contain at least one slash
 
+### `working-directory`
+
+Directory relative to which the 'dir' argument(s) will be resolved.
+
 ### `api-key`
 
 An [API key genereted in RStudio
