@@ -49,7 +49,7 @@ content. (Default `"."`)
 
 ### `working-directory`
 
-Directory relative to which the 'dir' argument(s) will be resolved.
+Directory relative to which the 'dir' argument(s) will be resolved. (Default `"."`).
 
 ### `api-key`
 
