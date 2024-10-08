@@ -228,7 +228,7 @@ async function publishFromDir (
       let success: Success = resp.noOp ? 'SKIP' : true
       for await (const result of poller.poll()) {
         core.debug(`received poll result: ${JSON.stringify(result)}`)
-        for (const line of result.status) {
+        for (const line of result.output) {
           if (showLogs) {
             core.info(line)
           }
@@ -245,15 +245,15 @@ async function publishFromDir (
           `id=${resp.appId}`
         ].join(' '))
 
-        const env = await envUpdater.updateAppEnvironment(resp.appId, dirName)
-        if (env.size === 0) {
+        const env = await envUpdater.updateAppEnvironment(resp.appGuid, dirName)
+        if (env.length === 0) {
           core.debug([
             'no environment variables updated for',
             `dir=${dirName}`,
             `id=${resp.appId}`
           ].join(' '))
         } else {
-          for (const key of env.keys()) {
+          for (const key of env) {
             core.debug([
               'updated environment',
               `variable=${JSON.stringify(key)}`,
