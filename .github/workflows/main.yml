@@ -21,16 +21,16 @@ jobs:
       run:
         working-directory: setup-connect
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: '16'
+          node-version: '24'
       - run: npm install
       - run: npm run lint
       - run: npm run build
       - run: npm test
       - run: git diff --exit-code --ignore-all-space
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - uses: ./setup-connect
@@ -62,10 +62,10 @@ jobs:
       run:
         working-directory: connect-publish
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: '16'
+          node-version: '24'
       - run: npm install
       - run: npm run lint
       - run: npm run build

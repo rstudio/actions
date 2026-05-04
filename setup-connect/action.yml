@@ -15,5 +15,5 @@ inputs:
     description: Version of rsconnect-python to install
     default: latest
 runs:
-  using: node16
+  using: node24
   main: dist/index.js
