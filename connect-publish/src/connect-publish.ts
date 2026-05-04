@@ -56,7 +56,7 @@ export type Success = boolean | 'SKIP'
 
 export interface ConnectPublishResult {
   dir: string
-  id: number
+  id: string
   success: Success
   url: string
 }
@@ -105,7 +105,7 @@ export async function connectPublish (args: ActionArgs): Promise<ConnectPublishR
         }
 
         core.info('  ' + ([
-          `    id: ${bold(res.id.toString())}`,
+          `    id: ${bold(res.id)}`,
           `   dir: ${bold(res.dir)}`,
           `   url: ${bold(res.url)}`,
           `status: ${bold(successChar, successColor)}`
@@ -210,8 +210,8 @@ async function publishFromDir (
     }
     core.info([
       `${publishing} ${bold(dirName)} to ${bold(resp.appUrl)}${why}`,
-      `     id: ${bold(resp.appId.toString())}`,
-      `   name: ${bold(resp.appName.toString())}`,
+      `     id: ${bold(resp.appId)}`,
+      `   name: ${bold(resp.appName)}`,
       `   guid: ${bold(resp.appGuid)}`,
       `  title: ${bold(resp.title)}`
     ].join('\n'))
@@ -278,7 +278,7 @@ async function publishFromDir (
       core.error(err as Error)
       return {
         dir: dirName,
-        id: -1,
+        id: '',
         success: false,
         url: ''
       }
