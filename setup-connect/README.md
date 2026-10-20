@@ -1,5 +1,7 @@
 # `rstudio/actions/setup-connect`
 
+> This action is deprecated. See https://github.com/posit-dev/connect-actions. 
+
 This action may be use for setting up the environment to perform
 actions with an RStudio Connect API, such as publishing an app.
 
